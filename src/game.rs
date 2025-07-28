@@ -1,10 +1,26 @@
+use anyhow::Result;
+
 use crate::shmem::GameMemory;
 
 const SEARCH_STRING: &[u8] = b"GALERIANS";
 const NEW_GAME_MENU_STATE: i32 = 99;
+const TRAILER_MENU_STATE: i32 = 200;
 const STAGE_D_INDEX: u32 = 3;
 const GAME_END_FLAGS: [u32; 4] = [37, 38, 39, 80];
 const FLAG_BANK_SIZE: u32 = 4 * 8;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum GameCheck {
+    Same,
+    Changed,
+    Unknown,
+}
+
+impl GameCheck {
+    pub const fn is_valid(&self) -> bool {
+        !matches!(self, GameCheck::Unknown)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct GameVersion {
@@ -44,6 +60,11 @@ impl GameVersion {
 
         None
     }
+
+    pub fn validate(&self, game_memory: &GameMemory) -> bool {
+        let compare_value = game_memory.read_slice(self.search_string_address, SEARCH_STRING.len());
+        compare_value == SEARCH_STRING
+    }
 }
 
 const GAME_VERSIONS: [GameVersion; 2] = [
@@ -80,6 +101,10 @@ impl Game {
         Self { version, memory }
     }
 
+    pub fn version_name(&self) -> &'static str {
+        self.version.name
+    }
+
     pub fn main_menu_state(&self) -> i32 {
         let menu_module_id: i16 = self.memory.read_num(self.version.menu_module_id_address);
         if menu_module_id != self.version.main_menu_module_id {
@@ -90,7 +115,7 @@ impl Game {
     }
 
     pub fn is_new_game_start(&self) -> bool {
-        self.main_menu_state() >= NEW_GAME_MENU_STATE
+        (NEW_GAME_MENU_STATE..TRAILER_MENU_STATE).contains(&self.main_menu_state())
     }
 
     pub fn is_at_main_menu(&self) -> bool {
@@ -119,6 +144,43 @@ impl Game {
         }
 
         true
+    }
+
+    /// Check that the emulator providing the game memory is still running
+    pub fn check_emulator(&self) -> bool {
+        self.memory.check_pulse()
+    }
+
+    /// Search for a new emulator process when we've lost our old one
+    pub fn search_for_emulator(&mut self) -> Result<bool> {
+        Ok(match GameMemory::discover()? {
+            Some(memory) => {
+                self.memory = memory;
+                true
+            }
+            None => false,
+        })
+    }
+
+    /// Check to make sure a different game hasn't been loaded in the emulator since we started watching
+    pub fn check_version(&mut self) -> GameCheck {
+        if self.version.validate(&self.memory) {
+            return GameCheck::Same;
+        }
+
+        self.search_for_game()
+    }
+
+    /// Search for the next game version to be loaded since the last one was unloaded
+    pub fn search_for_game(&mut self) -> GameCheck {
+        // the game has changed. see if it's another game we know about or a complete unknown.
+        match GameVersion::detect(&self.memory) {
+            Some(new_version) => {
+                self.version = new_version;
+                GameCheck::Changed
+            }
+            None => GameCheck::Unknown,
+        }
     }
 }
 

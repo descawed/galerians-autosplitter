@@ -1,18 +1,14 @@
 use std::path::PathBuf;
-use std::thread;
 use std::time::Duration;
 
 use anyhow::Result;
 use clap::Parser;
 
 mod game;
-use game::{Game, GameVersion};
+mod lss;
 mod shmem;
-use shmem::GameMemory;
 mod split;
 use split::AutoSplitter;
-
-const EMULATOR_RETRY_DURATION: Duration = Duration::from_millis(5000);
 
 #[derive(Parser, Debug)]
 #[command(about)]
@@ -33,41 +29,8 @@ fn main() -> Result<()> {
 
     let args = Cli::parse();
 
-    // locate emulator memory
-    let mut warned_about_shmem = false;
-    let game_mem = match args.shared_memory_path {
-        Some(path) => GameMemory::from_shmem(&path)?,
-        None => {
-            loop {
-                if let Some(game_mem) = GameMemory::discover()? {
-                    break game_mem;
-                }
-
-                if !warned_about_shmem {
-                    warned_about_shmem = true;
-                    log::error!("Failed to locate emulator memory. Retrying...");
-                }
-                thread::sleep(EMULATOR_RETRY_DURATION);
-            }
-        }
-    };
-
-    // detect loaded game version
-    // TODO: re-check this periodically in case the player loads another game without closing the program
-    let game = loop {
-        if let Some(version) = GameVersion::detect(&game_mem) {
-            break Game::new(version, game_mem);
-        }
-
-        thread::sleep(EMULATOR_RETRY_DURATION);
-    };
-
     // create autosplitter
-    let mut splitter = AutoSplitter::create(game, ("localhost", args.live_split_port))?;
     let update_duration = Duration::from_millis(args.update_frequency);
-
-    loop {
-        splitter.update()?;
-        thread::sleep(update_duration);
-    }
+    let mut splitter = AutoSplitter::create(args.shared_memory_path.as_deref(), update_duration, args.live_split_port)?;
+    splitter.update()
 }

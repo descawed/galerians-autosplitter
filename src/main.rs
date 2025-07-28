@@ -11,7 +11,7 @@ mod split;
 use split::AutoSplitter;
 
 #[derive(Parser, Debug)]
-#[command(about)]
+#[command(version, about)]
 struct Cli {
     /// Port that the LiveSplit server is running on
     #[arg(short, long, default_value_t = 16834)]

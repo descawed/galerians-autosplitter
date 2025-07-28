@@ -42,8 +42,6 @@ this duration with the `-u`/`--update-frequency` option.
 
 ## Known Issues
 
-- The app will break if you close or restart LiveSplit or the emulator after it connects to them. You can just restart
-  the app to fix it, although if you were in the middle of a run, it won't properly recognize that after it restarts.
-- If you manually reset a run, the app can get confused and get out of sync with what's happening in LiveSplit.
-- If you load a different game in the emulator after the app has connected to it, it won't notice and will keep trying
-  to autosplit for Galerians. Make sure to stop the autosplitter before switching to a different game.
+- When you do stuff manually in LiveSplit (e.g. manually resetting), it can take the autosplitter a few seconds to
+  to notice, so if you're rapidly toggling things in LiveSplit and taking actions in-game, it's possible you could get
+  some weird behavior.

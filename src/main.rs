@@ -15,6 +15,7 @@ use split::AutoSplitter;
 const EMULATOR_RETRY_DURATION: Duration = Duration::from_millis(5000);
 
 #[derive(Parser, Debug)]
+#[command(about)]
 struct Cli {
     /// Port that the LiveSplit server is running on
     #[arg(short, long, default_value_t = 16834)]

@@ -3,6 +3,8 @@ name = "galerians-autosplitter-shmem"
 version = "0.1.0"
 authors = ["descawed <github@descawed.com>"]
 edition = "2024"
+description = "A LiveSplit-compatible autosplitter for speedrunning Galerians in supported emulators"
+readme = "README.md"
 
 [dependencies]
 anyhow = "1.0.98"

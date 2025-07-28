@@ -1,0 +1,14 @@
+[package]
+name = "galerians-autosplitter-shmem"
+version = "0.1.0"
+authors = ["descawed <github@descawed.com>"]
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+clap = { version = "4.5.41", features = ["derive"] }
+colog = "1.3.0"
+log = "0.4.27"
+memmap2 = "0.9.7"
+nix = { version = "0.30.1", features = ["process", "signal"] }
+num-traits = "0.2.19"

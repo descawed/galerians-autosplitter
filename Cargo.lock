@@ -182,7 +182,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "galerians-autosplitter-shmem"
+name = "galerians-autosplitter"
 version = "0.1.0"
 dependencies = [
  "anyhow",

@@ -6,7 +6,7 @@ Works with both DuckStation and PCSX-Redux. Supports the North American and Japa
 ## Basic Usage
 
 - Build with `cargo build`
-- Run the `galerians-autosplitter-shmem` executable
+- Run the `galerians-autosplitter` executable
 - Right-click on LiveSplit and select Control > Start TCP Server (you'll need to do this every time you start LiveSplit)
 - If you're using DuckStation, go to Settings > Advanced and enable the "Export Shared Memory" setting (may require a
   restart of DuckStation to take effect)

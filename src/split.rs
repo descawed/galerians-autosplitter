@@ -14,9 +14,9 @@ const EMULATOR_RETRY_DURATION: Duration = Duration::from_millis(5000);
 const SECOND_ROOM: (u16, u16) = (0, 1);
 const FINAL_BOSS_ROOM: (u16, u16) = (8, 7);
 
-const LIVE_SPLIT_KEEP_ALIVE: i32 = 1000; // ~15 seconds at the default update frequency
-const EMULATOR_KEEP_ALIVE: i32 = 1000;
-const GAME_KEEP_ALIVE: i32 = 334; // ~5 seconds at the default update frequency
+const LIVE_SPLIT_KEEP_ALIVE: i32 = 334; // ~5 seconds at the default update frequency
+const EMULATOR_KEEP_ALIVE: i32 = 334;
+const GAME_KEEP_ALIVE: i32 = 200; // ~3 seconds at the default update frequency
 
 #[derive(Debug, Clone)]
 struct KeepAliveCounter {

@@ -101,7 +101,7 @@ fn wait_for_live_split(port: u16) -> LiveSplit {
 
 fn wait_for_emulator(path: Option<&Path>) -> Result<GameMemory> {
     Ok(match path {
-        Some(path) => GameMemory::from_shmem(&path, None)?,
+        Some(path) => GameMemory::from_shmem(path, None)?,
         None => {
             log::info!("Waiting for emulator...");
             loop {

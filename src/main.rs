@@ -2,13 +2,32 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 
 mod autosplitter;
 use autosplitter::AutoSplitter;
 mod game;
 mod lss;
 mod shmem;
+mod splits;
+use splits::{Event, KEY_EVENT_SPLITS};
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum SplitType {
+    /// Split on all doors
+    AllDoors,
+    /// Split on specific key events - key item pickups, bosses, and hotel progression events
+    KeyEvents,
+}
+
+impl SplitType {
+    const fn splits(&self) -> Option<&'static [Event]> {
+        match self {
+            Self::AllDoors => None,
+            Self::KeyEvents => Some(&KEY_EVENT_SPLITS),
+        }
+    }
+}
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -22,6 +41,9 @@ struct Cli {
     /// How often to update the state of the game in milliseconds
     #[arg(short, long, default_value_t = 15)]
     update_frequency: u64,
+    /// Strategy for when to split
+    #[arg(short, long, value_enum, default_value_t = SplitType::AllDoors)]
+    split_type: SplitType,
 }
 
 fn main() -> Result<()> {
@@ -31,6 +53,11 @@ fn main() -> Result<()> {
 
     // create autosplitter
     let update_duration = Duration::from_millis(args.update_frequency);
-    let mut splitter = AutoSplitter::create(args.shared_memory_path.as_deref(), update_duration, args.live_split_port)?;
+    let mut splitter = AutoSplitter::create(
+        args.shared_memory_path.as_deref(),
+        update_duration,
+        args.live_split_port,
+        args.split_type.splits(),
+    )?;
     splitter.update()
 }

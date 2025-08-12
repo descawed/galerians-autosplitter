@@ -1,6 +1,6 @@
 [package]
 name = "galerians-autosplitter"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["descawed <github@descawed.com>"]
 edition = "2024"
 description = "A LiveSplit-compatible autosplitter for speedrunning Galerians in supported emulators"
@@ -8,8 +8,8 @@ readme = "README.md"
 repository = "https://github.com/descawed/galerians-autosplitter"
 
 [dependencies]
-anyhow = "1.0.98"
-clap = { version = "4.5.41", features = ["derive"] }
+anyhow = "1.0.99"
+clap = { version = "4.5.44", features = ["derive"] }
 colog = "1.3.0"
 log = "0.4.27"
 memmap2 = "0.9.7"

@@ -1,4 +1,6 @@
+use std::iter::Peekable;
 use std::path::Path;
+use std::slice::Iter;
 use std::thread;
 use std::time::Duration;
 
@@ -7,6 +9,7 @@ use anyhow::Result;
 use crate::game::{Game, GameCheck, GameVersion};
 use crate::lss::{LiveSplit, TimerPhase};
 use crate::shmem::GameMemory;
+use crate::splits::Event;
 
 const CONNECTION_RETRY_DURATION: Duration = Duration::from_millis(1000);
 const EMULATOR_RETRY_DURATION: Duration = Duration::from_millis(5000);
@@ -59,14 +62,6 @@ impl ConnectionState {
             Self::EmulatorPending => Self::GamePending,
             _ => Self::Connected,
         };
-    }
-
-    fn get_delay(&self, update_frequency: Duration) -> Duration {
-        match self {
-            Self::EmulatorPending | Self::GamePending => EMULATOR_RETRY_DURATION,
-            Self::LiveSplitPending => CONNECTION_RETRY_DURATION,
-            _ => update_frequency,
-        }
     }
 }
 
@@ -137,10 +132,12 @@ pub struct AutoSplitter {
     live_split_keep_alive: KeepAliveCounter,
     emulator_keep_alive: KeepAliveCounter,
     game_keep_alive: KeepAliveCounter,
+    splits: Option<&'static [Event]>,
+    next_split: Option<Peekable<Iter<'static, Event>>>,
 }
 
 impl AutoSplitter {
-    pub fn create(shared_memory_path: Option<&Path>, update_frequency: Duration, live_split_port: u16) -> Result<Self> {
+    pub fn create(shared_memory_path: Option<&Path>, update_frequency: Duration, live_split_port: u16, splits: Option<&'static [Event]>) -> Result<Self> {
         let live_split = wait_for_live_split(live_split_port);
         let game_memory = wait_for_emulator(shared_memory_path)?;
         let game = wait_for_version(game_memory);
@@ -157,6 +154,8 @@ impl AutoSplitter {
             live_split_keep_alive: KeepAliveCounter::new(LIVE_SPLIT_KEEP_ALIVE),
             emulator_keep_alive: KeepAliveCounter::new(EMULATOR_KEEP_ALIVE),
             game_keep_alive: KeepAliveCounter::new(GAME_KEEP_ALIVE),
+            splits,
+            next_split: None,
         })
     }
 
@@ -172,6 +171,10 @@ impl AutoSplitter {
         if self.run_state == RunState::NotStarted {
             self.run_state = RunState::Intro;
             self.last_room = (0, 0);
+            // if we have explicit splits, start the iterator
+            if let Some(splits) = self.splits {
+                self.next_split = Some(splits.iter().peekable());
+            }
         }
         self.live_split.split()
     }
@@ -180,6 +183,7 @@ impl AutoSplitter {
         if self.run_state.is_started() {
             self.live_split.reset()?;
             self.run_state = RunState::NotStarted;
+            self.next_split = None;
         }
 
         Ok(())
@@ -197,7 +201,11 @@ impl AutoSplitter {
     }
 
     fn delay(&self) {
-        let delay = self.connection_state.get_delay(self.update_frequency);
+        let delay = match self.connection_state {
+            ConnectionState::EmulatorPending | ConnectionState::GamePending => EMULATOR_RETRY_DURATION,
+            ConnectionState::LiveSplitPending => CONNECTION_RETRY_DURATION,
+            _ => self.update_frequency,
+        };
         thread::sleep(delay);
     }
 
@@ -205,7 +213,7 @@ impl AutoSplitter {
         self.run_state = match self.live_split.get_timer_phase()? {
             TimerPhase::NotRunning => RunState::NotStarted,
             TimerPhase::Ended => RunState::Finished,
-            _ => if self.live_split.get_split_index()? == 0 {
+            _ => if self.run_state != RunState::Active && self.live_split.get_split_index()? == 0 {
                 RunState::Intro
             } else {
                 RunState::Active
@@ -263,6 +271,24 @@ impl AutoSplitter {
         }
     }
 
+    fn check_split_event(&mut self) -> bool {
+        let Some(&event) = self.next_split.as_mut().and_then(Peekable::peek) else {
+            return false;
+        };
+
+        let did_event_occur = match event {
+            Event::Room(map, room) => (*map as u16, *room) == self.current_room(),
+            Event::Flag(stage, flag) => self.game.flag(*stage, *flag),
+            Event::Item(item) => self.game.has_item(*item),
+        };
+
+        if did_event_occur {
+            self.next_split.as_mut().unwrap().next();
+        }
+
+        did_event_occur
+    }
+
     fn update_splits(&mut self) -> Result<()> {
         if self.live_split_keep_alive.should_check() {
             // make sure the LiveSplit connection is still good and our run state is in sync with theirs
@@ -318,7 +344,12 @@ impl AutoSplitter {
                 log::debug!("Player reached second room");
                 self.run_state = RunState::Active;
                 self.last_room = SECOND_ROOM;
-                self.split()
+                // if we're splitting on all doors, split now
+                if self.splits.is_none() {
+                    self.split()
+                } else {
+                    Ok(())
+                }
             } else {
                 Ok(())
             };
@@ -336,6 +367,10 @@ impl AutoSplitter {
                 self.run_state = RunState::Finished;
                 self.split()?;
                 log::info!("Run completed!");
+            }
+        } else if self.splits.is_some() {
+            if self.check_split_event() {
+                self.split()?;
             }
         } else {
             let current_room = self.current_room();

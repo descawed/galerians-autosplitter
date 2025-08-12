@@ -7,7 +7,7 @@ use anyhow::{anyhow, bail, Result};
 use memmap2::Mmap;
 use nix::sys::signal::kill;
 use nix::unistd::Pid;
-use num_traits::FromBytes;
+use num_traits::{ConstZero, FromBytes};
 
 const SHMEM_PATH: &str = "/dev/shm";
 const EMULATOR_STRINGS: [(&str, &str); 2] = [("duckstation_", "DuckStation"), ("pcsx-redux-wram-", "PCSX-Redux")];
@@ -116,5 +116,17 @@ impl GameMemory {
     pub fn read_num<const N: usize, T: FromBytes<Bytes = [u8; N]>>(&self, address: u32) -> T {
         let bytes: T::Bytes = self.read(address);
         T::from_le_bytes(&bytes)
+    }
+
+    pub fn read_nums<const M: usize, const N: usize, T: FromBytes<Bytes = [u8; N]> + ConstZero>(&self, address: u32) -> [T; M] {
+        let mut out = [T::ZERO; M];
+        let bytes = self.read_slice(address, M * N);
+        for (num, bytes) in out.iter_mut().zip(bytes.chunks_exact(N)) {
+            let mut num_bytes = [0u8; N];
+            num_bytes.copy_from_slice(bytes);
+            *num = T::from_le_bytes(&num_bytes);
+        }
+
+        out
     }
 }

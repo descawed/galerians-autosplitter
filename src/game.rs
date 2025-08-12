@@ -5,9 +5,83 @@ use crate::shmem::GameMemory;
 const SEARCH_STRING: &[u8] = b"GALERIANS";
 const NEW_GAME_MENU_STATE: i32 = 99;
 const TRAILER_MENU_STATE: i32 = 200;
-const STAGE_D_INDEX: u32 = 3;
 const GAME_END_FLAGS: [u32; 4] = [37, 38, 39, 80];
 const FLAG_BANK_SIZE: u32 = 4 * 8;
+const MAX_ITEMS: usize = 41;
+
+// silencing "unused" warnings on these enums. even if all the possible values aren't used today,
+// I still want them to be defined here both as a reference and for potential future use.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum Stage {
+    A = 0,
+    B = 1,
+    C = 2,
+    D = 3,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u16)]
+pub enum Map {
+    Hospital15F = 0,
+    Hospital14F = 1,
+    Hospital13F = 2,
+    YourHouseFirstFloor = 3,
+    YourHouseSecondFloor = 4,
+    HotelLower = 5,
+    Hotel2F = 6,
+    Hotel3F = 7,
+    MushroomTower = 8,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i16)]
+pub enum Item {
+    MemoryChip15F = 0,
+    SecurityCard = 1,
+    Beeject = 2,
+    FreezerRoomKey = 3,
+    PpecStorageKey = 4,
+    Fuse = 5,
+    LiquidExplosive = 6,
+    MemoryChip14F = 7,
+    SecurityCardReformatted = 8,
+    SpecialPpecOfficeKey = 9,
+    MemoryChip13F = 10,
+    TestLabKey = 11,
+    ControlRoomKey = 12,
+    ResearchLabKey = 13,
+    TwoHeadedSnake = 14,
+    TwoHeadedMonkey = 15,
+    TwoHeadedWolf = 16,
+    TwoHeadedEagle = 17,
+    YourHouseMemoryChip = 18,
+    BackdoorKey = 19,
+    DoorKnob = 20,
+    NineBall = 21,
+    MothersRing = 22,
+    FathersRing = 23,
+    LiliasDoll = 24,
+    Metamorphosis = 25,
+    BedroomKey = 26,
+    SecondFloorKey = 27,
+    MedicalStaffNotes = 28,
+    GProjectReport = 29,
+    PhotoOfParents = 30,
+    RionsTestData = 31,
+    DrLemsNotes = 32,
+    NewReplicativeComputerTheory = 33,
+    DrPascallesDiary = 34,
+    LetterFromElsa = 35,
+    Newspaper = 36,
+    ThreeBall = 37,
+    ShedKey = 38,
+    LetterFromLilia = 39,
+    DFelon = 40,
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum GameCheck {
@@ -32,10 +106,12 @@ pub struct GameVersion {
     map_id_address: u32,
     room_id_address: u32,
     flag_banks_address: u32,
+    inventory_address: u32,
+    inventory_count_address: u32,
 }
 
 impl GameVersion {
-    pub const fn flag_bank_address(&self, stage_index: u32, flag_index: u32) -> (u32, u64) {
+    pub const fn flag_bank_address(&self, stage: Stage, flag_index: u32) -> (u32, u64) {
         let (bank_offset, bit_index) = if flag_index >= 128 {
             (FLAG_BANK_SIZE * 2, flag_index - 128)
         } else if flag_index >= 64 {
@@ -44,15 +120,14 @@ impl GameVersion {
             (0, flag_index)
         };
 
-        let stage_offset = stage_index * 8;
+        let stage_offset = stage as u32 * 8;
 
         (self.flag_banks_address + bank_offset + stage_offset, 1u64 << bit_index)
     }
 
     pub fn detect(game_memory: &GameMemory) -> Option<&'static Self> {
         for version in &GAME_VERSIONS {
-            let compare_value = game_memory.read_slice(version.search_string_address, SEARCH_STRING.len());
-            if compare_value == SEARCH_STRING {
+            if version.validate(game_memory) {
                 log::info!("Detected game version: {}", version.name);
                 return Some(version);
             }
@@ -77,6 +152,8 @@ const GAME_VERSIONS: [GameVersion; 2] = [
         map_id_address: 0x801912DC,
         room_id_address: 0x801912DE,
         flag_banks_address: 0x801AF9A0,
+        inventory_address: 0x801AFAAC,
+        inventory_count_address: 0x801AFAFE,
     },
     GameVersion {
         name: "NTSC-J",
@@ -87,6 +164,8 @@ const GAME_VERSIONS: [GameVersion; 2] = [
         map_id_address: 0x801912B4,
         room_id_address: 0x801912B6,
         flag_banks_address: 0x801AFFA0,
+        inventory_address: 0x801B00AC,
+        inventory_count_address: 0x801B00FE,
     },
 ];
 
@@ -130,20 +209,26 @@ impl Game {
         self.memory.read_num(self.version.room_id_address)
     }
 
-    pub fn flag(&self, stage_index: u32, flag_index: u32) -> bool {
-        let (bank_address, bit_value) = self.version.flag_bank_address(stage_index, flag_index);
+    pub fn flag(&self, stage: Stage, flag_index: u32) -> bool {
+        let (bank_address, bit_value) = self.version.flag_bank_address(stage, flag_index);
         let bank: u64 = self.memory.read_num(bank_address);
         bank & bit_value != 0
     }
 
     pub fn has_defeated_final_boss(&self) -> bool {
         for &flag in &GAME_END_FLAGS {
-            if !self.flag(STAGE_D_INDEX, flag) {
+            if !self.flag(Stage::D, flag) {
                 return false;
             }
         }
 
         true
+    }
+
+    pub fn has_item(&self, item_id: Item) -> bool {
+        let num_items: u16 = self.memory.read_num(self.version.inventory_count_address);
+        let items: [i16; MAX_ITEMS] = self.memory.read_nums(self.version.inventory_address);
+        items[..num_items as usize].contains(&(item_id as i16))
     }
 
     /// Check that the emulator providing the game memory is still running
@@ -191,7 +276,7 @@ mod tests {
     #[test]
     fn test_flag_bank_address_low() {
         let version = &GAME_VERSIONS[0];
-        let (bank_address, bit_value) = version.flag_bank_address(STAGE_D_INDEX, GAME_END_FLAGS[1]);
+        let (bank_address, bit_value) = version.flag_bank_address(Stage::D, GAME_END_FLAGS[1]);
         assert_eq!(bank_address, 0x801af9b8);
         assert_eq!(bit_value, 0x4000000000);
     }
@@ -199,7 +284,7 @@ mod tests {
     #[test]
     fn test_flag_bank_address_high() {
         let version = &GAME_VERSIONS[1];
-        let (bank_address, bit_value) = version.flag_bank_address(STAGE_D_INDEX, GAME_END_FLAGS[3]);
+        let (bank_address, bit_value) = version.flag_bank_address(Stage::D, GAME_END_FLAGS[3]);
         assert_eq!(bank_address, 0x801affd8);
         assert_eq!(bit_value, 0x10000);
     }

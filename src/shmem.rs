@@ -17,11 +17,7 @@ const fn addr(address: u32) -> usize {
 }
 
 fn is_pid_alive(pid: i32) -> bool {
-    match kill(Pid::from_raw(pid), None) {
-        Ok(()) => true,
-        Err(nix::errno::Errno::ESRCH) => false,
-        Err(_) => true,
-    }
+    !matches!(kill(Pid::from_raw(pid), None), Err(nix::errno::Errno::ESRCH))
 }
 
 fn pid_from_path(path: &Path) -> Result<i32> {

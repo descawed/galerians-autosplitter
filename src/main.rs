@@ -42,7 +42,7 @@ struct Cli {
     #[arg(short, long, default_value_t = 15)]
     update_frequency: u64,
     /// Strategy for when to split
-    #[arg(short, long, value_enum, default_value_t = SplitType::AllDoors)]
+    #[arg(short = 'p', long, value_enum, default_value_t = SplitType::AllDoors)]
     split_type: SplitType,
 }
 

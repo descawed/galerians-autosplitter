@@ -110,11 +110,18 @@ fn wait_for_emulator(path: Option<&Path>) -> Result<GameMemory> {
     })
 }
 
-fn wait_for_version(game_memory: GameMemory) -> Game {
+fn wait_for_version(mut game_memory: GameMemory) -> Result<Game> {
     log::info!("Waiting for game to be loaded...");
     loop {
+        // make sure we don't lose the emulator while we're waiting for the game
+        if !game_memory.check_pulse() {
+            log::warn!("Lost emulator");
+            game_memory = wait_for_emulator(None)?;
+            log::info!("Waiting for game to be loaded...");
+        }
+
         if let Some(version) = GameVersion::detect(&game_memory) {
-            return Game::new(version, game_memory);
+            return Ok(Game::new(version, game_memory));
         }
 
         thread::sleep(EMULATOR_RETRY_DURATION);
@@ -140,7 +147,7 @@ impl AutoSplitter {
     pub fn create(shared_memory_path: Option<&Path>, update_frequency: Duration, live_split_port: u16, splits: Option<&'static [Event]>) -> Result<Self> {
         let live_split = wait_for_live_split(live_split_port);
         let game_memory = wait_for_emulator(shared_memory_path)?;
-        let game = wait_for_version(game_memory);
+        let game = wait_for_version(game_memory)?;
 
         log::info!("Autosplitter is ready to go");
 
@@ -191,6 +198,13 @@ impl AutoSplitter {
 
     fn conn_fail(&mut self, new_state: ConnectionState) -> Result<()> {
         self.connection_state = new_state;
+
+        match self.connection_state {
+            ConnectionState::EmulatorPending => log::warn!("Lost emulator; resetting and waiting for emulator..."),
+            ConnectionState::GamePending => log::warn!("Game unloaded; resetting and waiting for a recognized game to be loaded..."),
+            _ => (),
+        }
+
         // don't try to reset if we've lost the LiveSplit connection because it will just immediately
         // fail
         if self.live_split.is_connected() {
@@ -228,7 +242,7 @@ impl AutoSplitter {
             match self.connection_state {
                 ConnectionState::LiveSplitPending => self.wait_for_live_split(),
                 ConnectionState::EmulatorPending => self.wait_for_emulator()?,
-                ConnectionState::GamePending => self.wait_for_game(),
+                ConnectionState::GamePending => self.wait_for_game()?,
                 ConnectionState::Connected => self.update_splits()?,
             }
 
@@ -264,11 +278,18 @@ impl AutoSplitter {
         Ok(())
     }
 
-    fn wait_for_game(&mut self) {
+    fn wait_for_game(&mut self) -> Result<()> {
+        // make sure we don't lose the emulator while we're waiting for the game
+        if !self.game.check_emulator() {
+            return self.conn_fail(ConnectionState::EmulatorPending);
+        }
+
         if self.game.search_for_game().is_valid() {
             self.game_keep_alive.reset();
             self.connection_state.advance();
         }
+
+        Ok(())
     }
 
     fn check_split_event(&mut self) -> bool {
@@ -301,7 +322,6 @@ impl AutoSplitter {
         if self.emulator_keep_alive.should_check() {
             // make sure the emulator is still running
             if !self.game.check_emulator() {
-                log::warn!("Lost emulator; resetting and waiting for emulator...");
                 return self.conn_fail(ConnectionState::EmulatorPending);
             }
         }
@@ -318,7 +338,6 @@ impl AutoSplitter {
                 }
                 GameCheck::Unknown => {
                     // we lost the game - reset and go back to a waiting state
-                    log::warn!("Game unloaded; resetting and waiting for a recognized game to be loaded...");
                     return self.conn_fail(ConnectionState::GamePending);
                 }
             }

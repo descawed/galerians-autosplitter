@@ -43,5 +43,5 @@ this duration with the `-u`/`--update-frequency` option.
 ## Known Issues
 
 - When you do stuff manually in LiveSplit (e.g. manually resetting), it can take the autosplitter a few seconds to
-  to notice, so if you're rapidly toggling things in LiveSplit and taking actions in-game, it's possible you could get
+  notice, so if you're rapidly toggling things in LiveSplit and taking actions in-game, it's possible you could get
   some weird behavior.

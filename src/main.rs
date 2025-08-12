@@ -4,11 +4,11 @@ use std::time::Duration;
 use anyhow::Result;
 use clap::Parser;
 
+mod autosplitter;
+use autosplitter::AutoSplitter;
 mod game;
 mod lss;
 mod shmem;
-mod split;
-use split::AutoSplitter;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]

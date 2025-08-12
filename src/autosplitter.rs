@@ -1,6 +1,4 @@
-use std::iter::Peekable;
 use std::path::Path;
-use std::slice::Iter;
 use std::thread;
 use std::time::Duration;
 
@@ -140,7 +138,6 @@ pub struct AutoSplitter {
     emulator_keep_alive: KeepAliveCounter,
     game_keep_alive: KeepAliveCounter,
     splits: Option<&'static [Event]>,
-    next_split: Option<Peekable<Iter<'static, Event>>>,
 }
 
 impl AutoSplitter {
@@ -162,7 +159,6 @@ impl AutoSplitter {
             emulator_keep_alive: KeepAliveCounter::new(EMULATOR_KEEP_ALIVE),
             game_keep_alive: KeepAliveCounter::new(GAME_KEEP_ALIVE),
             splits,
-            next_split: None,
         })
     }
 
@@ -178,10 +174,6 @@ impl AutoSplitter {
         if self.run_state == RunState::NotStarted {
             self.run_state = RunState::Intro;
             self.last_room = (0, 0);
-            // if we have explicit splits, start the iterator
-            if let Some(splits) = self.splits {
-                self.next_split = Some(splits.iter().peekable());
-            }
         }
         self.live_split.split()
     }
@@ -190,7 +182,6 @@ impl AutoSplitter {
         if self.run_state.is_started() {
             self.live_split.reset()?;
             self.run_state = RunState::NotStarted;
-            self.next_split = None;
         }
 
         Ok(())
@@ -292,22 +283,21 @@ impl AutoSplitter {
         Ok(())
     }
 
-    fn check_split_event(&mut self) -> bool {
-        let Some(&event) = self.next_split.as_mut().and_then(Peekable::peek) else {
-            return false;
+    fn check_split_event(&mut self) -> Result<bool> {
+        let split_index = self.live_split.get_split_index()?;
+        if split_index < 0 {
+            return Ok(false);
+        }
+
+        let Some(event) = self.splits.and_then(|s| s.get(split_index as usize)) else {
+            return Ok(false);
         };
 
-        let did_event_occur = match event {
+        Ok(match event {
             Event::Room(map, room) => (*map as u16, *room) == self.current_room(),
             Event::Flag(stage, flag) => self.game.flag(*stage, *flag),
             Event::Item(item) => self.game.has_item(*item),
-        };
-
-        if did_event_occur {
-            self.next_split.as_mut().unwrap().next();
-        }
-
-        did_event_occur
+        })
     }
 
     fn update_splits(&mut self) -> Result<()> {
@@ -388,7 +378,7 @@ impl AutoSplitter {
                 log::info!("Run completed!");
             }
         } else if self.splits.is_some() {
-            if self.check_split_event() {
+            if self.check_split_event()? {
                 self.split()?;
             }
         } else {

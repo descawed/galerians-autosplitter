@@ -40,6 +40,12 @@ LiveSplit's default port, 16834, but you can use the `-l`/`--live-split-port` op
 need to. By default, the autosplitter will check the game state and update LiveSplit every 15ms, but you can control
 this duration with the `-u`/`--update-frequency` option.
 
+By default, the autosplitter splits on every door, but you can choose a different split strategy with the
+`-p`/`--split-type` option. Currently, the only other option is `key-events`, which splits on a series of key
+progression events that I've selected. This includes most key item pickups in stages A and B, progression events in
+stage C, the start of each stage, and boss fights. Once I nail down the route, I'll also add an option to split on doors
+but only in the correct order.
+
 ## Known Issues
 
 - When you do stuff manually in LiveSplit (e.g. manually resetting), it can take the autosplitter a few seconds to

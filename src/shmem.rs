@@ -102,9 +102,8 @@ impl GameMemory {
     }
 
     pub fn read<const N: usize>(&self, address: u32) -> [u8; N] {
-        let a = addr(address);
         let mut buf = [0u8; N];
-        buf.copy_from_slice(&self.0[a..a + N]);
+        buf.copy_from_slice(self.read_slice(address, N));
         buf
     }
 

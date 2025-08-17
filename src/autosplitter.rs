@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 
+use crate::SplitType;
 use crate::game::{Game, GameCheck, GameVersion};
 use crate::lss::{LiveSplit, TimerPhase};
 use crate::shmem::GameMemory;
@@ -19,6 +20,8 @@ const LIVE_SPLIT_KEEP_ALIVE: i32 = 334; // ~5 seconds at the default update freq
 const EMULATOR_KEEP_ALIVE: i32 = 334;
 const GAME_KEEP_ALIVE: i32 = 200; // ~3 seconds at the default update frequency
 
+const SPLIT_TYPE_VARIABLE_NAME: &str = "GaleriansSplitType";
+
 #[derive(Debug, Clone)]
 struct KeepAliveCounter {
     period: i32,
@@ -28,6 +31,11 @@ struct KeepAliveCounter {
 impl KeepAliveCounter {
     const fn new(period: i32) -> Self {
         Self { period, remaining: period }
+    }
+    
+    const fn with_trigger_on_start(mut self) -> Self {
+        self.remaining = 0;
+        self
     }
 
     const fn should_check(&mut self) -> bool {
@@ -137,11 +145,14 @@ pub struct AutoSplitter {
     live_split_keep_alive: KeepAliveCounter,
     emulator_keep_alive: KeepAliveCounter,
     game_keep_alive: KeepAliveCounter,
+    requested_split_type: Option<SplitType>,
+    effective_split_type: Option<SplitType>,
+    last_reported_split_type: Option<SplitType>,
     splits: Option<&'static [Event]>,
 }
 
 impl AutoSplitter {
-    pub fn create(shared_memory_path: Option<&Path>, update_frequency: Duration, live_split_port: u16, splits: Option<&'static [Event]>) -> Result<Self> {
+    pub fn create(shared_memory_path: Option<&Path>, update_frequency: Duration, live_split_port: u16, requested_split_type: Option<SplitType>) -> Result<Self> {
         let live_split = wait_for_live_split(live_split_port);
         let game_memory = wait_for_emulator(shared_memory_path)?;
         let game = wait_for_version(game_memory)?;
@@ -155,10 +166,14 @@ impl AutoSplitter {
             game,
             run_state: RunState::NotStarted,
             last_room: (0, 0),
-            live_split_keep_alive: KeepAliveCounter::new(LIVE_SPLIT_KEEP_ALIVE),
+            // need to trigger LiveSplit sync on first update so split type is set
+            live_split_keep_alive: KeepAliveCounter::new(LIVE_SPLIT_KEEP_ALIVE).with_trigger_on_start(),
             emulator_keep_alive: KeepAliveCounter::new(EMULATOR_KEEP_ALIVE),
             game_keep_alive: KeepAliveCounter::new(GAME_KEEP_ALIVE),
-            splits,
+            requested_split_type,
+            effective_split_type: None,
+            last_reported_split_type: None,
+            splits: None,
         })
     }
 
@@ -214,6 +229,80 @@ impl AutoSplitter {
         thread::sleep(delay);
     }
 
+    fn set_split_type(&mut self, split_type: SplitType) {
+        self.effective_split_type = Some(split_type);
+        self.splits = split_type.splits();
+    }
+    
+    fn get_live_split_split_type(&mut self) -> Result<Option<SplitType>> {
+        let Some(str_split_type) = self.live_split.get_custom_variable_value(SPLIT_TYPE_VARIABLE_NAME)? else {
+            return Ok(None);
+        };
+        
+        let Ok(split_type) = SplitType::try_from(str_split_type.as_str()) else {
+            log::warn!("LiveSplit reported unrecognized split type {str_split_type}; ignoring");
+            return Ok(None);
+        };
+        
+        Ok(Some(split_type))
+    }
+    
+    fn sync_split_type(&mut self) -> Result<()> {
+        let live_split_split_type = self.get_live_split_split_type()?;
+
+        match (self.requested_split_type, self.effective_split_type, live_split_split_type) {
+            (None, None, None) => {
+                log::warn!("No split type was specified by either the user or the splits; defaulting to all-doors");
+                self.set_split_type(SplitType::AllDoors);
+            }
+            (None, None, Some(split_type)) => {
+                log::info!("Split type {} detected from LiveSplit splits", split_type.as_str());
+                self.set_split_type(split_type);
+            }
+            (None, Some(old_split_type), Some(new_split_type)) => {
+                if old_split_type != new_split_type {
+                    log::info!("LiveSplit splits were changed; new split type is {}. Resetting", new_split_type.as_str());
+                    self.set_split_type(new_split_type);
+                    self.reset()?;
+                }
+            }
+            (_, Some(old_split_type), None) => {
+                if self.last_reported_split_type.is_some() {
+                    log::warn!(
+                        "LiveSplit splits were changed but the new split type could not be detected. Continuing to use old split type {}",
+                        old_split_type.as_str(),
+                    );
+                }
+            }
+            (Some(requested_split_type), None, None) => self.set_split_type(requested_split_type),
+            (Some(requested_split_type), None, Some(reported_split_type)) => {
+                if requested_split_type != reported_split_type {
+                    log::warn!(
+                        "User requested split type {} but LiveSplit reported split type {}. Going with user choice {}",
+                        requested_split_type.as_str(),
+                        reported_split_type.as_str(),
+                        requested_split_type.as_str(),
+                    );
+                }
+                self.set_split_type(requested_split_type);
+            }
+            (Some(requested_split_type), Some(_), Some(reported_split_type)) => {
+                if self.last_reported_split_type != Some(reported_split_type) && requested_split_type != reported_split_type {
+                    log::warn!(
+                        "LiveSplit splits were changed and the new LiveSplit-reported split type {} does not match the user-requested split type {}. Continuing to use user-requested split type {}",
+                        reported_split_type.as_str(),
+                        requested_split_type.as_str(),
+                        requested_split_type.as_str(),
+                    );
+                }
+            }
+        }
+        
+        self.last_reported_split_type = live_split_split_type;
+
+        Ok(())
+    }
+
     fn sync_with_live_split(&mut self) -> Result<()> {
         self.run_state = match self.live_split.get_timer_phase()? {
             TimerPhase::NotRunning => RunState::NotStarted,
@@ -224,6 +313,8 @@ impl AutoSplitter {
                 RunState::Active
             },
         };
+
+        self.sync_split_type()?;
 
         Ok(())
     }

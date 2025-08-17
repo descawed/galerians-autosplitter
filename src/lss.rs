@@ -152,4 +152,18 @@ impl LiveSplit {
         let response = self.recv()?;
         TimerPhase::try_from_raw(&response).ok_or_else(|| anyhow!("Invalid timer phase received from LiveSplit server"))
     }
+
+    pub fn get_custom_variable_value(&mut self, variable_name: &str) -> Result<Option<String>> {
+        self.send(b"getcustomvariablevalue ")?;
+        self.send(variable_name.as_bytes())?;
+        self.send(b"\n")?;
+
+        let response = self.recv()?;
+        let value = str::from_utf8(&response)?;
+        if value == "-" || value.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(value.to_string()))
+        }
+    }
 }

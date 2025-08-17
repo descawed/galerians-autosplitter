@@ -40,11 +40,16 @@ LiveSplit's default port, 16834, but you can use the `-l`/`--live-split-port` op
 need to. By default, the autosplitter will check the game state and update LiveSplit every 15ms, but you can control
 this duration with the `-u`/`--update-frequency` option.
 
-By default, the autosplitter splits on every door, but you can choose a different split strategy with the
-`-p`/`--split-type` option. Currently, the only other option is `key-events`, which splits on a series of key
-progression events that I've selected. This includes most key item pickups in stages A and B, progression events in
-stage C, the start of each stage, and boss fights. Once I nail down the route, I'll also add an option to split on doors
-but only in the correct order.
+The autosplitter currently supports two splitting strategies - splitting on every door (`all-doors`) or splitting on a
+series of key progression events that I've selected (`key-events`). The latter includes most key item pickups in stages
+A and B, progression events in stage C, and boss fights, and they only trigger a split if done in the correct route
+order. Once I nail down the route, I'll also add an option to split on doors but only in the correct order. The splits
+included in this repo in the assets directory contain a custom variable indicating which split type they're intended
+for, so if you're using those splits, it's generally not necessary to specify the split type explicitly; it will be
+detected after connecting to LiveSplit with an appropriate split file loaded. If for some reason you do need to
+explicitly specify the split type, this can be done with the `-p`/`--split-type` option. If the splits you're using
+don't contain the custom variable indicating which split type to use and you don't specify a split type with this
+option, the autosplitter will print a warning and default to `all-doors`.
 
 ## Known Issues
 

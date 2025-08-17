@@ -13,7 +13,9 @@
     <Variables>
       <Variable name="Platform">Emulator</Variable>
     </Variables>
-    <CustomVariables />
+    <CustomVariables>
+      <Variable name="GaleriansSplitType">KeyEvents</Variable>
+    </CustomVariables>
   </Metadata>
   <Offset>00:00:00</Offset>
   <AttemptCount>0</AttemptCount>

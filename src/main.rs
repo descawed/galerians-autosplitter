@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::{Parser, ValueEnum};
 
 mod autosplitter;
@@ -27,6 +27,25 @@ impl SplitType {
             Self::KeyEvents => Some(&KEY_EVENT_SPLITS),
         }
     }
+
+    const fn as_str(&self) -> &'static str {
+        match self {
+            Self::AllDoors => "all-doors",
+            Self::KeyEvents => "key-events",
+        }
+    }
+}
+
+impl TryFrom<&str> for SplitType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+        match value {
+            "AllDoors" | "all-doors" => Ok(Self::AllDoors),
+            "KeyEvents" | "key-events" => Ok(Self::KeyEvents),
+            _ => Err(anyhow!("Unknown split type: {value}")),
+        }
+    }
 }
 
 #[derive(Parser, Debug)]
@@ -41,9 +60,11 @@ struct Cli {
     /// How often to update the state of the game in milliseconds
     #[arg(short, long, default_value_t = 15)]
     update_frequency: u64,
-    /// Strategy for when to split
-    #[arg(short = 'p', long, value_enum, default_value_t = SplitType::AllDoors)]
-    split_type: SplitType,
+    /// Strategy for when to split. If not provided, it will be determined from LiveSplit's split
+    /// settings if possible. If the LiveSplit split settings also don't have a valid split type,
+    /// defaults to all-doors.
+    #[arg(short = 'p', long, value_enum)]
+    split_type: Option<SplitType>,
 }
 
 fn main() -> Result<()> {
@@ -57,7 +78,7 @@ fn main() -> Result<()> {
         args.shared_memory_path.as_deref(),
         update_duration,
         args.live_split_port,
-        args.split_type.splits(),
+        args.split_type,
     )?;
     splitter.update()
 }

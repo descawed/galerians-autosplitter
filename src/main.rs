@@ -10,12 +10,14 @@ mod game;
 mod lss;
 mod shmem;
 mod splits;
-use splits::{Event, KEY_EVENT_SPLITS};
+use splits::{Event, DOOR_SPLITS, KEY_EVENT_SPLITS};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum SplitType {
     /// Split on all doors
     AllDoors,
+    /// Split on doors, but only when the door is the expected next door in the route
+    RouteDoors,
     /// Split on specific key events - key item pickups, bosses, and hotel progression events
     KeyEvents,
 }
@@ -24,6 +26,7 @@ impl SplitType {
     const fn splits(&self) -> Option<&'static [Event]> {
         match self {
             Self::AllDoors => None,
+            Self::RouteDoors => Some(&DOOR_SPLITS),
             Self::KeyEvents => Some(&KEY_EVENT_SPLITS),
         }
     }
@@ -31,6 +34,7 @@ impl SplitType {
     const fn as_str(&self) -> &'static str {
         match self {
             Self::AllDoors => "all-doors",
+            Self::RouteDoors => "route-doors",
             Self::KeyEvents => "key-events",
         }
     }
@@ -42,6 +46,7 @@ impl TryFrom<&str> for SplitType {
     fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
         match value {
             "AllDoors" | "all-doors" => Ok(Self::AllDoors),
+            "RouteDoors" | "route-doors" => Ok(Self::RouteDoors),
             "KeyEvents" | "key-events" => Ok(Self::KeyEvents),
             _ => Err(anyhow!("Unknown split type: {value}")),
         }

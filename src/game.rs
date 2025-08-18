@@ -21,16 +21,15 @@ pub enum Stage {
     D = 3,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
 pub enum Map {
     Hospital15F = 0,
     Hospital14F = 1,
     Hospital13F = 2,
-    YourHouseFirstFloor = 3,
-    YourHouseSecondFloor = 4,
-    HotelLower = 5,
+    YourHouse1F = 3,
+    YourHouse2F = 4,
+    Hotel1F = 5,
     Hotel2F = 6,
     Hotel3F = 7,
     MushroomTower = 8,

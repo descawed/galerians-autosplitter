@@ -386,6 +386,10 @@ impl AutoSplitter {
 
         Ok(match event {
             Event::Room(map, room) => (*map as u16, *room) == self.current_room(),
+            Event::Room2((map1, room1), (map2, room2)) => {
+                let current_room = self.current_room();
+                (*map1 as u16, *room1) == current_room || (*map2 as u16, *room2) == current_room
+            }
             Event::Flag(stage, flag) => self.game.flag(*stage, *flag),
             Event::Item(item) => self.game.has_item(*item),
         })
@@ -475,7 +479,6 @@ impl AutoSplitter {
             }
         } else if self.last_room != current_room {
             // player changed rooms; split
-            // TODO: only split if the player went the right way
             log::debug!("Room change: map = {}, room = {}", self.last_room.0, self.last_room.1);
             self.split()?;
         }

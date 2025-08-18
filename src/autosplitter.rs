@@ -459,29 +459,28 @@ impl AutoSplitter {
         }
 
         // the run is active, so check for player progression
+        let current_room = self.current_room();
         if self.last_room == FINAL_BOSS_ROOM {
             // if we're in the final boss room, start watching flags to see when the player beats
             // the game. we'll also stop watching for room changes, since there's no way out of
             // here but to win.
             if self.game.has_defeated_final_boss() {
-                self.run_state = RunState::Finished;
                 self.split()?;
+                self.run_state = RunState::Finished;
                 log::info!("Run completed!");
             }
         } else if self.splits.is_some() {
             if self.check_split_event()? {
                 self.split()?;
             }
-        } else {
-            let current_room = self.current_room();
-            if self.last_room != current_room {
-                // player changed rooms; split
-                // TODO: only split if the player went the right way
-                log::debug!("Room change: map = {}, room = {}", self.last_room.0, self.last_room.1);
-                self.split()?;
-                self.last_room = current_room;
-            }
+        } else if self.last_room != current_room {
+            // player changed rooms; split
+            // TODO: only split if the player went the right way
+            log::debug!("Room change: map = {}, room = {}", self.last_room.0, self.last_room.1);
+            self.split()?;
         }
+
+        self.last_room = current_room;
 
         Ok(())
     }

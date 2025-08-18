@@ -26,7 +26,7 @@ pub const KEY_EVENT_SPLITS: [Event; 45] = [
     // Lem is hardly a boss fight because you just press a button and he dies, so I decided to just
     // make the Lem split the whole end part of Stage A
     // Event::Room(Map::Hospital14F, 4), // A1405 (Lem)
-    Event::Room(Map::YourHouseFirstFloor, 3), // B0104; end of Stage A
+    Event::Room(Map::YourHouseFirstFloor, 11), // B0112; end of Stage A
     // Stage B
     Event::Item(Item::BackdoorKey),
     Event::Item(Item::SecondFloorKey),

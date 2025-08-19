@@ -162,8 +162,14 @@ impl PlatformInterface for RefCell<Platform> {
                 );
 
                 match Emulator::from_process(emulator_process) {
-                    Ok(emulator) => return Some(emulator),
-                    Err(e) => log::warn!("Failed to attach to {} process {}: {}", emulator_type.name(), pid, e),
+                    Ok(emulator) => {
+                        log::info!("Detected {}", emulator_type.name());
+                        return Some(emulator);
+                    }
+                    // both supported emulators spawn multiple processes, so if we log a warning
+                    // every time we see a process that matches the search string but doesn't have a
+                    // corresponding shared memory object, we're just going to be spamming the log
+                    Err(e) => log::debug!("Failed to attach to {} process {}: {}", emulator_type.name(), pid, e),
                 }
             }
         }

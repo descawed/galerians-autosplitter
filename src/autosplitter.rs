@@ -1,4 +1,5 @@
-use std::path::Path;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
 
@@ -7,11 +8,12 @@ use anyhow::Result;
 use crate::SplitType;
 use crate::game::{Game, GameCheck, GameVersion};
 use crate::lss::{LiveSplit, TimerPhase};
-use crate::shmem::GameMemory;
+use crate::shmem::{Emulator, Platform, PlatformInterface};
 use crate::splits::Event;
 
 const CONNECTION_RETRY_DURATION: Duration = Duration::from_millis(1000);
 const EMULATOR_RETRY_DURATION: Duration = Duration::from_millis(5000);
+const PROCESS_REFRESH_INTERVAL: Duration = Duration::from_millis(2000);
 
 const SECOND_ROOM: (u16, u16) = (0, 1);
 const FINAL_BOSS_ROOM: (u16, u16) = (8, 7);
@@ -100,34 +102,29 @@ fn wait_for_live_split(port: u16) -> LiveSplit {
     }
 }
 
-fn wait_for_emulator(path: Option<&Path>) -> Result<GameMemory> {
-    Ok(match path {
-        Some(path) => GameMemory::from_shmem(path, None)?,
-        None => {
-            log::info!("Waiting for emulator...");
-            loop {
-                if let Some(game_mem) = GameMemory::discover()? {
-                    break game_mem;
-                }
-
-                thread::sleep(EMULATOR_RETRY_DURATION);
-            }
+fn wait_for_emulator(platform: &Rc<RefCell<Platform>>) -> Emulator {
+    log::info!("Waiting for emulator...");
+    loop {
+        if let Some(emulator) = platform.search_for_emulator() {
+            return emulator;
         }
-    })
+
+        thread::sleep(EMULATOR_RETRY_DURATION);
+    }
 }
 
-fn wait_for_version(mut game_memory: GameMemory) -> Result<Game> {
+fn wait_for_version(mut emulator: Emulator, platform: &Rc<RefCell<Platform>>) -> Game {
     log::info!("Waiting for game to be loaded...");
     loop {
         // make sure we don't lose the emulator while we're waiting for the game
-        if !game_memory.check_pulse() {
+        if !emulator.check_pulse() {
             log::warn!("Lost emulator");
-            game_memory = wait_for_emulator(None)?;
+            emulator = wait_for_emulator(platform);
             log::info!("Waiting for game to be loaded...");
         }
 
-        if let Some(version) = GameVersion::detect(&game_memory) {
-            return Ok(Game::new(version, game_memory));
+        if let Some(version) = GameVersion::detect(&emulator) {
+            return Game::new(version, emulator);
         }
 
         thread::sleep(EMULATOR_RETRY_DURATION);
@@ -140,6 +137,7 @@ pub struct AutoSplitter {
     update_frequency: Duration,
     live_split: LiveSplit,
     game: Game,
+    platform: Rc<RefCell<Platform>>,
     run_state: RunState,
     last_room: (u16, u16),
     live_split_keep_alive: KeepAliveCounter,
@@ -152,18 +150,22 @@ pub struct AutoSplitter {
 }
 
 impl AutoSplitter {
-    pub fn create(shared_memory_path: Option<&Path>, update_frequency: Duration, live_split_port: u16, requested_split_type: Option<SplitType>) -> Result<Self> {
+    pub fn create(update_frequency: Duration, live_split_port: u16, requested_split_type: Option<SplitType>) -> Self {
         let live_split = wait_for_live_split(live_split_port);
-        let game_memory = wait_for_emulator(shared_memory_path)?;
-        let game = wait_for_version(game_memory)?;
+
+        let platform = Rc::new(RefCell::new(Platform::new(PROCESS_REFRESH_INTERVAL)));
+
+        let emulator = wait_for_emulator(&platform);
+        let game = wait_for_version(emulator, &platform);
 
         log::info!("Autosplitter is ready to go");
 
-        Ok(Self {
+        Self {
             connection_state: ConnectionState::Connected,
             update_frequency,
             live_split,
             game,
+            platform,
             run_state: RunState::NotStarted,
             last_room: (0, 0),
             // need to trigger LiveSplit sync on first update so split type is set
@@ -174,7 +176,7 @@ impl AutoSplitter {
             effective_split_type: None,
             last_reported_split_type: None,
             splits: None,
-        })
+        }
     }
 
     fn current_room(&self) -> (u16, u16) {
@@ -206,7 +208,7 @@ impl AutoSplitter {
         self.connection_state = new_state;
 
         match self.connection_state {
-            ConnectionState::EmulatorPending => log::warn!("Lost emulator; resetting and waiting for emulator..."),
+            ConnectionState::EmulatorPending => log::warn!("Lost emulator; resetting"),
             ConnectionState::GamePending => log::warn!("Game unloaded; resetting and waiting for a recognized game to be loaded..."),
             _ => (),
         }
@@ -323,7 +325,7 @@ impl AutoSplitter {
         loop {
             match self.connection_state {
                 ConnectionState::LiveSplitPending => self.wait_for_live_split(),
-                ConnectionState::EmulatorPending => self.wait_for_emulator()?,
+                ConnectionState::EmulatorPending => self.wait_for_emulator(),
                 ConnectionState::GamePending => self.wait_for_game()?,
                 ConnectionState::Connected => self.update_splits()?,
             }
@@ -351,13 +353,10 @@ impl AutoSplitter {
         }
     }
 
-    fn wait_for_emulator(&mut self) -> Result<()> {
-        if self.game.search_for_emulator()? {
-            self.emulator_keep_alive.reset();
-            self.connection_state.advance();
-        }
-
-        Ok(())
+    fn wait_for_emulator(&mut self) {
+        self.game.set_emulator(wait_for_emulator(&self.platform));
+        self.emulator_keep_alive.reset();
+        self.connection_state.advance();
     }
 
     fn wait_for_game(&mut self) -> Result<()> {

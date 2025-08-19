@@ -295,7 +295,7 @@ impl Emulator {
                 ptr::copy_nonoverlapping(src, dest, bytes_to_read);
             }
 
-            for (num, bytes) in (&mut out[i..end]).iter_mut().zip(buf.chunks_exact(N)) {
+            for (num, bytes) in out[i..end].iter_mut().zip(buf.chunks_exact(N)) {
                 let mut bytes_for_num = [0u8; N];
                 bytes_for_num.copy_from_slice(bytes);
                 *num = T::from_le_bytes(&bytes_for_num);

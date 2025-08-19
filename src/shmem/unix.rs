@@ -1,5 +1,3 @@
-#![cfg(unix)]
-
 use std::ffi::{CString, c_void};
 use std::io::Error;
 use std::ptr;

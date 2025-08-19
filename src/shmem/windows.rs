@@ -1,5 +1,3 @@
-#![cfg(windows)]
-
 use anyhow::{bail, Result};
 use windows::core::{PCWSTR, HSTRING};
 use windows::Win32::Foundation::{HANDLE, CloseHandle, GetLastError};

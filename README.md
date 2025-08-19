@@ -1,11 +1,10 @@
 # Galerians autosplitter
 
-This is an autosplitter for use with LiveSplit when speedrunning the PSX game Galerians. Currently only supports Linux.
-Works with both DuckStation and PCSX-Redux. Supports the North American and Japanese versions of the game.
+An autosplitter for use with LiveSplit when speedrunning the PSX game Galerians. Supports both DuckStation and 
+PCSX-Redux on Windows and Linux. Works with the North American and Japanese versions of the game.
 
 ## Basic Usage
 
-- Build with `cargo build`
 - Run the `galerians-autosplitter` executable
 - Right-click on LiveSplit and select Control > Start TCP Server (you'll need to do this every time you start LiveSplit)
 - If you're using DuckStation, go to Settings > Advanced and enable the "Export Shared Memory" setting (may require a
@@ -27,9 +26,8 @@ The app takes advantage of a feature of both DuckStation and PCSX-Redux (althoug
 where they put the emulated RAM in shared memory that other processes can access. This makes reading the game memory
 super simple and avoids having to know anything about the emulator internals or worry about version differences moving
 things around. I don't know yet if there are any other PSX emulators that have this feature, but if there are, adding
-support for them should be very straightforward. The app can auto-detect when a supported emulator has made the
-shared memory available by scanning for matching files in /dev/shm, but you can also explicitly specify the shared
-memory file with the `-s`/`--shared-memory-path` option if you need to.
+support for them should be very straightforward. The app will watch for a supported emulator to be running and connect
+automatically once one is available.
 
 The autosplitter uses LiveSplit's server feature to communicate with LiveSplit and tell it when to start, split, or
 reset. The server has to be started every time you start LiveSplit as described above. It defaults to connecting on

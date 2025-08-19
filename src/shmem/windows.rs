@@ -1,7 +1,7 @@
 #![cfg(windows)]
 
 use anyhow::{bail, Result};
-use windows::core::{PCWSTR, HSTRING, HRESULT};
+use windows::core::{PCWSTR, HSTRING};
 use windows::Win32::Foundation::{HANDLE, CloseHandle, GetLastError};
 use windows::Win32::System::Memory::{FILE_MAP_READ, MEMORY_MAPPED_VIEW_ADDRESS, OpenFileMappingW, MapViewOfFile, UnmapViewOfFile};
 

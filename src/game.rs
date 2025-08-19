@@ -1,6 +1,4 @@
-use anyhow::Result;
-
-use crate::shmem::GameMemory;
+use crate::shmem::Emulator;
 
 const SEARCH_STRING: &[u8] = b"GALERIANS";
 const NEW_GAME_MENU_STATE: i32 = 99;
@@ -124,9 +122,9 @@ impl GameVersion {
         (self.flag_banks_address + bank_offset + stage_offset, 1u64 << bit_index)
     }
 
-    pub fn detect(game_memory: &GameMemory) -> Option<&'static Self> {
+    pub fn detect(emulator: &Emulator) -> Option<&'static Self> {
         for version in &GAME_VERSIONS {
-            if version.validate(game_memory) {
+            if version.validate(emulator) {
                 log::info!("Detected game version: {}", version.name);
                 return Some(version);
             }
@@ -135,8 +133,9 @@ impl GameVersion {
         None
     }
 
-    pub fn validate(&self, game_memory: &GameMemory) -> bool {
-        let compare_value = game_memory.read_slice(self.search_string_address, SEARCH_STRING.len());
+    pub fn validate(&self, emulator: &Emulator) -> bool {
+        let mut compare_value = [0u8; SEARCH_STRING.len()];
+        emulator.read_into(self.search_string_address, &mut compare_value);
         compare_value == SEARCH_STRING
     }
 }
@@ -171,12 +170,12 @@ const GAME_VERSIONS: [GameVersion; 2] = [
 #[derive(Debug)]
 pub struct Game {
     version: &'static GameVersion,
-    memory: GameMemory,
+    emulator: Emulator,
 }
 
 impl Game {
-    pub const fn new(version: &'static GameVersion, memory: GameMemory) -> Self {
-        Self { version, memory }
+    pub const fn new(version: &'static GameVersion, emulator: Emulator) -> Self {
+        Self { version, emulator }
     }
 
     pub fn version_name(&self) -> &'static str {
@@ -184,12 +183,12 @@ impl Game {
     }
 
     pub fn main_menu_state(&self) -> i32 {
-        let menu_module_id: i16 = self.memory.read_num(self.version.menu_module_id_address);
+        let menu_module_id: i16 = self.emulator.read_num(self.version.menu_module_id_address);
         if menu_module_id != self.version.main_menu_module_id {
             return -1;
         }
 
-        self.memory.read_num(self.version.main_menu_state_address)
+        self.emulator.read_num(self.version.main_menu_state_address)
     }
 
     pub fn is_new_game_start(&self) -> bool {
@@ -201,16 +200,16 @@ impl Game {
     }
 
     pub fn map_id(&self) -> u16 {
-        self.memory.read_num(self.version.map_id_address)
+        self.emulator.read_num(self.version.map_id_address)
     }
 
     pub fn room_id(&self) -> u16 {
-        self.memory.read_num(self.version.room_id_address)
+        self.emulator.read_num(self.version.room_id_address)
     }
 
     pub fn flag(&self, stage: Stage, flag_index: u32) -> bool {
         let (bank_address, bit_value) = self.version.flag_bank_address(stage, flag_index);
-        let bank: u64 = self.memory.read_num(bank_address);
+        let bank: u64 = self.emulator.read_num(bank_address);
         bank & bit_value != 0
     }
 
@@ -225,30 +224,24 @@ impl Game {
     }
 
     pub fn has_item(&self, item_id: Item) -> bool {
-        let num_items: u16 = self.memory.read_num(self.version.inventory_count_address);
-        let items: [i16; MAX_ITEMS] = self.memory.read_nums(self.version.inventory_address);
+        let num_items: u16 = self.emulator.read_num(self.version.inventory_count_address);
+        let items: [i16; MAX_ITEMS] = self.emulator.read_nums(self.version.inventory_address);
         items[..num_items as usize].contains(&(item_id as i16))
     }
 
     /// Check that the emulator providing the game memory is still running
     pub fn check_emulator(&self) -> bool {
-        self.memory.check_pulse()
+        self.emulator.check_pulse()
     }
 
-    /// Search for a new emulator process when we've lost our old one
-    pub fn search_for_emulator(&mut self) -> Result<bool> {
-        Ok(match GameMemory::discover()? {
-            Some(memory) => {
-                self.memory = memory;
-                true
-            }
-            None => false,
-        })
+    /// Set a new emulator to read game data from
+    pub fn set_emulator(&mut self, emulator: Emulator) {
+        self.emulator = emulator;
     }
 
     /// Check to make sure a different game hasn't been loaded in the emulator since we started watching
     pub fn check_version(&mut self) -> GameCheck {
-        if self.version.validate(&self.memory) {
+        if self.version.validate(&self.emulator) {
             return GameCheck::Same;
         }
 
@@ -258,7 +251,7 @@ impl Game {
     /// Search for the next game version to be loaded since the last one was unloaded
     pub fn search_for_game(&mut self) -> GameCheck {
         // the game has changed. see if it's another game we know about or a complete unknown.
-        match GameVersion::detect(&self.memory) {
+        match GameVersion::detect(&self.emulator) {
             Some(new_version) => {
                 self.version = new_version;
                 GameCheck::Changed

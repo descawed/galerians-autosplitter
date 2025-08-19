@@ -38,7 +38,7 @@ pub struct LiveSplit {
 
 impl LiveSplit {
     pub fn create(port: u16) -> Result<Self> {
-        let addr = ("localhost", port).to_socket_addrs()?.next().unwrap();
+        let addr = ("127.0.0.1", port).to_socket_addrs()?.next().unwrap();
         let connection = BufReader::new(TcpStream::connect(addr)?);
         log::info!("Successfully connected to LiveSplit");
 

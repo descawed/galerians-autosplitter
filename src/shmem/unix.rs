@@ -35,7 +35,7 @@ impl SharedMemoryClient for UnixSharedMemoryClient {
     fn open(name: &str, size: usize) -> Result<Self> {
         let c_name = CString::new(name)?;
         let shm_fd = unsafe {
-            libc::shm_open(c_name.as_ptr(), libc::O_RDONLY, libc::S_IRUSR)
+            libc::shm_open(c_name.as_ptr(), libc::O_RDONLY, 0)
         };
         if shm_fd == -1 {
             let errno = Error::last_os_error();
@@ -50,7 +50,7 @@ impl SharedMemoryClient for UnixSharedMemoryClient {
             unsafe { close_shm(name, shm_fd) };
             bail!("Failed to map shared memory object {name}: {errno}");
         }
-        
+
         Ok(Self {
             name: String::from(name),
             shm_fd,
@@ -77,7 +77,7 @@ impl Drop for UnixSharedMemoryClient {
             let errno = Error::last_os_error();
             log::error!("Failed to unmap shared memory {} at {:p}: {}", self.name, self.base, errno);
         }
-        
+
         unsafe {
             close_shm(&self.name, self.shm_fd);
         }

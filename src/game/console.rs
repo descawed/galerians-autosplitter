@@ -3,16 +3,14 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
-use opencv::core::CV_32F;
 use opencv::prelude::*;
 use opencv::imgcodecs::{IMREAD_GRAYSCALE, imread};
 use opencv::videoio::VideoCapture;
 
 use super::{Game, GameState, Item, Map, Stage};
 use crate::image::{
-    BACKGROUND_WIDTH, BACKGROUND_HEIGHT,
     CaptureImage, CaptureTransform, CaptureTransformJson, MaskImage, MaskedImage, ReferenceImage,
-    gray_float,
+    gray_float, is_fade_out,
 };
 use crate::platform::PlatformRef;
 
@@ -83,12 +81,6 @@ fn load_bg_map() -> Result<BackgroundMap> {
     Ok(bg_map)
 }
 
-fn all_black(transform: &CaptureTransform, mask: &MaskImage) -> Result<MaskedImage> {
-    let black_screen = Mat::zeros(BACKGROUND_HEIGHT, BACKGROUND_WIDTH, CV_32F)?.to_mat()?;
-    let black_screen = transform.transform_bg(&black_screen)?;
-    mask.mask(&black_screen)
-}
-
 #[derive(Debug)]
 pub struct ConsoleGame {
     capture_device: VideoCapture,
@@ -96,7 +88,6 @@ pub struct ConsoleGame {
     hud_mask: MaskImage,
     main_menu: ReferenceImage,
     bg_map: BackgroundMap,
-    black_screen: ReferenceImage,
     current_map: Map,
     current_room: u16,
     current_links: Vec<(Map, u16, ReferenceImage)>,
@@ -112,7 +103,6 @@ impl ConsoleGame {
         hud_mask: MaskImage,
         main_menu: ReferenceImage,
         bg_map: BackgroundMap,
-        black_screen: ReferenceImage,
     ) -> Self {
         Self {
             capture_device,
@@ -120,7 +110,6 @@ impl ConsoleGame {
             hud_mask,
             main_menu,
             bg_map,
-            black_screen,
             current_map: Map::Hospital15F,
             current_room: 0,
             current_links: Vec::new(),
@@ -149,14 +138,11 @@ impl ConsoleGame {
 
         let hud_mask = MaskImage::new(transform.transform_bg(&hud_mask)?)?;
 
-        let black_screen = all_black(&transform, &hud_mask)?;
-        let black_screen = ReferenceImage::new(black_screen)?;
-
         let main_menu = transform.transform_bg(&main_menu)?;
         let main_menu = MaskedImage::unmasked(main_menu);
         let main_menu = ReferenceImage::new(main_menu)?;
 
-        Ok(Self::new(capture_device, transform, hud_mask, main_menu, bg_map, black_screen))
+        Ok(Self::new(capture_device, transform, hud_mask, main_menu, bg_map))
     }
 
     fn is_in_final_boss_room(&self) -> bool {
@@ -214,17 +200,16 @@ impl ConsoleGame {
         if self.is_in_final_boss_room() && !self.has_defeated_final_boss {
             // TODO: make sure this doesn't trigger too early; this room is pretty dark to begin with
             // FIXME: this would also trigger if the player dies
-            if self.black_screen.is_match_to(&capture)? {
+            if is_fade_out(&trans_capture)? {
                 self.has_defeated_final_boss = true;
                 return Ok(());
             }
         }
 
         // if we're at the main menu, check for the start of a new game
-        let capture = MaskedImage::unmasked(trans_capture);
         if self.is_at_main_menu && !self.is_new_game_start {
             // FIXME: this would also trigger if the trailer starts playing
-            if self.black_screen.is_match_to(&capture)? {
+            if is_fade_out(&trans_capture)? {
                 self.is_at_main_menu = false;
                 self.is_new_game_start = true;
                 log::debug!("New game start");
@@ -234,6 +219,7 @@ impl ConsoleGame {
 
         // lastly, check if the player is at the main menu
         if !self.is_at_main_menu {
+            let capture = MaskedImage::unmasked(trans_capture);
             if self.main_menu.is_match_to(&capture)? {
                 self.set_room(Map::Hospital15F, 0)?;
                 log::debug!("At main menu");

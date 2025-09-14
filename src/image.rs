@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 const GRAYSCALE_NORM: f64 = 1.0 / 255.0;
 const BLACK_MAX: u8 = 10;
+const FADE_MAX: f64 = 0.05;
 const MATCH_THRESHOLD: f64 = 0.7;
 pub const BACKGROUND_WIDTH: i32 = 320;
 pub const BACKGROUND_HEIGHT: i32 = 240;
@@ -35,6 +36,15 @@ const fn is_black(pixel: &Point3_<u8>) -> bool {
     pixel.x < BLACK_MAX && pixel.y < BLACK_MAX && pixel.z < BLACK_MAX
 }
 
+pub fn is_fade_out(mat: &Mat) -> Result<bool> {
+    if mat.typ() != CV_32FC1 {
+        bail!("Image must be 32-bit floating point grayscale");
+    }
+    let num_pixels = (mat.rows() * mat.cols()) as f64;
+    let average_pixel = sum_elems(&mat)?.0[0] / num_pixels;
+    Ok(average_pixel < FADE_MAX)
+}
+
 fn sum_elems_square(mat: &Mat) -> Result<f64> {
     Ok(sum_elems(&mat.elem_mul(mat).into_result()?)?.0[0])
 }
@@ -56,13 +66,11 @@ fn zncc(capture: &Mat, reference: &Mat, mask: &Mat) -> Result<f64> {
     let mask_sum = sum_elems(&mask)?.0[0];
 
     let capture = capture.elem_mul(mask).into_result()?;
-    debug_show(&capture.to_mat()?)?;
     let capture = (&capture - (sum_elems(&capture)? / mask_sum)).into_result()?;
     let capture = capture.to_mat()?;
     let capture_square_sum = sum_elems_square(&capture)?;
 
     let reference = reference.elem_mul(mask).into_result()?;
-    debug_show(&reference.to_mat()?)?;
     let reference = (&reference - (sum_elems(&reference)? / mask_sum)).into_result()?;
     let reference = reference.to_mat()?;
     let reference_square_sum = sum_elems_square(&reference)?;

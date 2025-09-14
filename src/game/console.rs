@@ -20,6 +20,7 @@ const DEVICE_SETTINGS_PATH: &str = "device.json";
 const BACKGROUND_PATH: &str = "assets/backgrounds/";
 const CALIBRATION_IMAGE_PATH: &str = "assets/backgrounds/A1501_4.png";
 const HUD_MASK_PATH: &str = "assets/backgrounds/hud_mask.png";
+const MAIN_MENU_PATH: &str = "assets/backgrounds/main_menu.png";
 const BG_MAP_PATH: &str = "assets/backgrounds/bg_map.json";
 const FINAL_BOSS_ROOM: (Map, u16) = (Map::MushroomTower, 7);
 
@@ -54,10 +55,10 @@ fn load_gray(path: impl AsRef<str>) -> Result<Mat> {
 }
 
 fn calibrate(capture_device: &mut VideoCapture, hud_mask: &Mat) -> Result<CaptureTransform> {
-    println!(
-        "Before starting a run, we must first calibrate the video capture. "
-        "Please start a new game, wait until you gain control of Rion in the first room, and then press enter."
-    );
+    println!(concat!(
+        "Before starting a run, we must first calibrate the video capture. ",
+        "Please start a new game, wait until you gain control of Rion in the first room, and then press enter.",
+    ));
     std::io::stdin().read_line(&mut String::new())?;
 
     let mut frame = Mat::default();
@@ -93,12 +94,14 @@ pub struct ConsoleGame {
     capture_device: VideoCapture,
     transform: CaptureTransform,
     hud_mask: MaskImage,
+    main_menu: ReferenceImage,
     bg_map: BackgroundMap,
     black_screen: ReferenceImage,
     current_map: Map,
     current_room: u16,
     current_links: Vec<(Map, u16, ReferenceImage)>,
     has_defeated_final_boss: bool,
+    is_at_main_menu: bool,
 }
 
 impl ConsoleGame {
@@ -106,6 +109,7 @@ impl ConsoleGame {
         capture_device: VideoCapture,
         transform: CaptureTransform,
         hud_mask: MaskImage,
+        main_menu: ReferenceImage,
         bg_map: BackgroundMap,
         black_screen: ReferenceImage,
     ) -> Self {
@@ -113,18 +117,21 @@ impl ConsoleGame {
             capture_device,
             transform,
             hud_mask,
+            main_menu,
             bg_map,
             black_screen,
             current_map: Map::Hospital15F,
             current_room: 0,
             current_links: Vec::new(),
             has_defeated_final_boss: false,
+            is_at_main_menu: false,
         }
     }
 
     pub fn connect(device_index: i32, force_calibrate: bool) -> Result<Self> {
         let mut capture_device = VideoCapture::new_def(device_index)?;
         let hud_mask = load_gray(HUD_MASK_PATH)?;
+        let main_menu = load_gray(MAIN_MENU_PATH)?;
         let bg_map = load_bg_map()?;
 
         let mut settings = load_device_settings()?;
@@ -143,7 +150,11 @@ impl ConsoleGame {
         let black_screen = all_black(&transform, &hud_mask)?;
         let black_screen = ReferenceImage::new(black_screen)?;
 
-        Ok(Self::new(capture_device, transform, hud_mask, bg_map, black_screen))
+        let main_menu = transform.transform_bg(&main_menu)?;
+        let main_menu = MaskedImage::unmasked(main_menu);
+        let main_menu = ReferenceImage::new(main_menu)?;
+
+        Ok(Self::new(capture_device, transform, hud_mask, main_menu, bg_map, black_screen))
     }
 
     fn is_in_final_boss_room(&self) -> bool {
@@ -158,6 +169,7 @@ impl ConsoleGame {
         self.current_map = map;
         self.current_room = room;
         self.has_defeated_final_boss = false;
+        self.is_at_main_menu = false;
 
         self.current_links.clear();
         let Some(links) = self.bg_map.get(&(self.current_map, self.current_room)) else {
@@ -184,7 +196,8 @@ impl ConsoleGame {
         self.capture_device.read(&mut frame)?;
 
         let capture_image = CaptureImage::new(frame)?;
-        let capture = capture_image.transform(&self.transform, &self.hud_mask)?;
+        let trans_capture = capture_image.transform(&self.transform)?;
+        let capture = self.hud_mask.mask(&trans_capture)?;
 
         for (dest_map, dest_room, reference_image) in &self.current_links {
             if reference_image.is_match_to(&capture)? {
@@ -197,9 +210,18 @@ impl ConsoleGame {
         // to black
         if self.is_in_final_boss_room() && !self.has_defeated_final_boss {
             // TODO: make sure this doesn't trigger too early, as this room is pretty dark to begin with
+            // FIXME: this would also trigger if the player dies
             if self.black_screen.is_match_to(&capture)? {
                 self.has_defeated_final_boss = true;
+                return Ok(());
             }
+        }
+
+        // lastly, check if the player is at the main menu
+        let capture = MaskedImage::unmasked(trans_capture);
+        if self.main_menu.is_match_to(&capture)? {
+            self.set_room(Map::Hospital15F, 0)?;
+            self.is_at_main_menu = true;
         }
 
         Ok(())
@@ -221,6 +243,10 @@ impl Game for ConsoleGame {
         bail!("Video capture reconnect is not implemented");
     }
 
+    fn is_at_main_menu(&self) -> bool {
+        self.is_at_main_menu
+    }
+
     fn map_id(&self) -> u16 {
         self.current_map as u16
     }
@@ -233,11 +259,11 @@ impl Game for ConsoleGame {
         panic!("Flag check is not possible for console autosplitter");
     }
 
-    fn has_item(&self, _item_id: Item) -> bool {
-        panic!("Item check is not implemented for console autosplitter");
-    }
-
     fn has_defeated_final_boss(&self) -> bool {
         self.has_defeated_final_boss
+    }
+
+    fn has_item(&self, _item_id: Item) -> bool {
+        panic!("Item check is not implemented for console autosplitter");
     }
 }

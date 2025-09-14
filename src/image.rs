@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 const GRAYSCALE_NORM: f64 = 1.0 / 255.0;
 const BLACK_MAX: u8 = 10;
-const MATCH_THRESHOLD: f64 = 0.6;
+const MATCH_THRESHOLD: f64 = 0.7;
 pub const BACKGROUND_WIDTH: i32 = 320;
 pub const BACKGROUND_HEIGHT: i32 = 240;
 const SEARCH_X: i32 = 12;
@@ -74,11 +74,13 @@ fn zncc(capture: &Mat, reference: &Mat, mask: &Mat) -> Result<f64> {
     let mask_sum = sum_elems(&mask)?.0[0];
 
     let capture = capture.elem_mul(mask).into_result()?;
+    debug_show(&capture.to_mat()?)?;
     let capture = (&capture - (sum_elems(&capture)? / mask_sum)).into_result()?;
     let capture = capture.to_mat()?;
     let capture_square_sum = sum_elems_square(&capture)?;
 
     let reference = reference.elem_mul(mask).into_result()?;
+    debug_show(&reference.to_mat()?)?;
     let reference = (&reference - (sum_elems(&reference)? / mask_sum)).into_result()?;
     let reference = reference.to_mat()?;
     let reference_square_sum = sum_elems_square(&reference)?;
@@ -103,6 +105,12 @@ fn debug_show(mat: &Mat) -> Result<()> {
 
 #[derive(Debug, Clone)]
 pub struct MaskedImage(Mat);
+
+impl MaskedImage {
+    pub const fn unmasked(image: Mat) -> Self {
+        Self(image)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct MaskImage {
@@ -285,8 +293,7 @@ impl CaptureImage {
         Ok(CaptureTransform::new(capture_roi, best_match.1))
     }
 
-    pub fn transform(&self, transform: &CaptureTransform, mask: &MaskImage) -> Result<MaskedImage> {
-        let transformed = transform.transform_capture(&self.0)?;
-        mask.mask(&transformed)
+    pub fn transform(&self, transform: &CaptureTransform) -> Result<Mat> {
+        transform.transform_capture(&self.0)
     }
 }

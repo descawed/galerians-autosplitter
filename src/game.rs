@@ -93,6 +93,10 @@ pub trait Game {
     fn update(&mut self) -> GameState;
     
     fn reconnect(&mut self, platform: &PlatformRef) -> Result<()>;
+
+    fn is_at_main_menu(&self) -> bool;
+
+    fn is_new_game_start(&self) -> bool;
     
     // this returns u16 instead of Map because we can't guarantee that there will always be a valid
     // map value in emulator memory

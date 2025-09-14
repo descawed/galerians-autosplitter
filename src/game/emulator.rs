@@ -160,14 +160,6 @@ impl EmulatorGame {
         self.emulator.read_num(self.version.main_menu_state_address)
     }
 
-    pub fn is_new_game_start(&self) -> bool {
-        (NEW_GAME_MENU_STATE..TRAILER_MENU_STATE).contains(&self.main_menu_state())
-    }
-
-    pub fn is_at_main_menu(&self) -> bool {
-        (0..NEW_GAME_MENU_STATE).contains(&self.main_menu_state())
-    }
-
     /// Check that the emulator providing the game memory is still running
     pub fn check_emulator(&self) -> bool {
         self.emulator.check_pulse()
@@ -218,6 +210,14 @@ impl Game for EmulatorGame {
         }
         
         Ok(())
+    }
+
+    fn is_new_game_start(&self) -> bool {
+        (NEW_GAME_MENU_STATE..TRAILER_MENU_STATE).contains(&self.main_menu_state())
+    }
+
+    fn is_at_main_menu(&self) -> bool {
+        (0..NEW_GAME_MENU_STATE).contains(&self.main_menu_state())
     }
 
     fn map_id(&self) -> u16 {

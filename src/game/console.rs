@@ -7,8 +7,9 @@ use opencv::prelude::*;
 use opencv::imgcodecs::{IMREAD_GRAYSCALE, imread};
 use opencv::videoio::VideoCapture;
 
-use super::{Game, Map};
-use crate::image::{CaptureImage, CaptureTransform, CaptureTransformJson, ReferenceImage, gray_float};
+use super::{Game, GameState, Item, Map, Stage};
+use crate::image::{CaptureImage, CaptureTransform, CaptureTransformJson, MaskImage, ReferenceImage, gray_float};
+use crate::platform::PlatformRef;
 
 const DEVICE_SETTINGS_PATH: &str = "device.json";
 const BACKGROUND_PATH: &str = "assets/backgrounds/";
@@ -37,7 +38,8 @@ fn save_device_settings(settings: &HashMap<i32, CaptureTransform>) -> Result<()>
     Ok(())
 }
 
-fn load_gray(path: &str) -> Result<Mat> {
+fn load_gray(path: impl AsRef<str>) -> Result<Mat> {
+    let path = path.as_ref();
     let mat = imread(path, IMREAD_GRAYSCALE)?;
     if mat.empty() {
         bail!("Failed to load image {path}");
@@ -63,14 +65,14 @@ fn calibrate(capture_device: &mut VideoCapture, hud_mask: &Mat) -> Result<Captur
 fn load_bg_map() -> Result<BackgroundMap> {
     let file = File::open(BG_MAP_PATH)?;
     let bg_list: Vec<((Map, u16, Map, u16), String)> = serde_json::from_reader(file)?;
-    
+
     let bg_path = Path::new(BACKGROUND_PATH);
     let mut bg_map = HashMap::new();
     for ((source_map, source_room, dest_map, dest_room), filename) in bg_list {
         let links = bg_map.entry((source_map, source_room)).or_insert_with(Vec::new);
         links.push((dest_map, dest_room, bg_path.join(filename)));
     }
-    
+
     Ok(bg_map)
 }
 
@@ -78,7 +80,7 @@ fn load_bg_map() -> Result<BackgroundMap> {
 pub struct ConsoleGame {
     capture_device: VideoCapture,
     transform: CaptureTransform,
-    hud_mask: Mat,
+    hud_mask: MaskImage,
     bg_map: BackgroundMap,
     current_map: Map,
     current_room: u16,
@@ -86,7 +88,7 @@ pub struct ConsoleGame {
 }
 
 impl ConsoleGame {
-    pub const fn new(capture_device: VideoCapture, transform: CaptureTransform, hud_mask: Mat, bg_map: BackgroundMap) -> Self {
+    pub const fn new(capture_device: VideoCapture, transform: CaptureTransform, hud_mask: MaskImage, bg_map: BackgroundMap) -> Self {
         Self {
             capture_device,
             transform,
@@ -113,7 +115,82 @@ impl ConsoleGame {
         } else {
             settings.get(&device_index).unwrap().clone()
         };
+        
+        let hud_mask = MaskImage::new(transform.transform_bg(&hud_mask)?)?;
 
         Ok(Self::new(capture_device, transform, hud_mask, bg_map))
+    }
+
+    fn set_room(&mut self, map: Map, room: u16) -> Result<()> {
+        if map == self.current_map && room == self.current_room && !self.current_links.is_empty() {
+            return Ok(());
+        }
+        
+        self.current_map = map;
+        self.current_room = room;
+
+        let Some(links) = self.bg_map.get(&(self.current_map, self.current_room)) else {
+            bail!("No room links for room {} {}", self.current_map as u16, self.current_room);
+        };
+
+        self.current_links.clear();
+        for (dest_map, dest_room, bg_path) in links {
+            let bg_image = load_gray(bg_path.to_string_lossy())?;
+            let bg_image = self.transform.transform_bg(&bg_image)?;
+            let bg_image = self.hud_mask.mask(&bg_image)?;
+            let reference_image = ReferenceImage::new(bg_image)?;
+            self.current_links.push((*dest_map, *dest_room, reference_image));
+        }
+
+        Ok(())
+    }
+
+    fn check_frame(&mut self) -> Result<()> {
+        let mut frame = Mat::default();
+        self.capture_device.read(&mut frame)?;
+
+        let capture_image = CaptureImage::new(frame)?;
+        let capture = capture_image.transform(&self.transform, &self.hud_mask)?;
+        
+        for (dest_map, dest_room, reference_image) in &self.current_links {
+            if reference_image.is_match_to(&capture)? {
+                self.set_room(*dest_map, *dest_room)?;
+                break;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl Game for ConsoleGame {
+    fn update(&mut self) -> GameState {
+        match self.check_frame() {
+            Ok(_) => GameState::Connected,
+            Err(e) => {
+                log::error!("Failed to check next capture frame: {e}");
+                GameState::Disconnected
+            }
+        }
+    }
+
+    fn reconnect(&mut self, _platform: &PlatformRef) -> Result<()> {
+        bail!("Video capture reconnect is not implemented");
+    }
+    
+    fn map_id(&self) -> u16 {
+        self.current_map as u16
+    }
+
+    fn room_id(&self) -> u16 {
+        self.current_room
+    }
+
+    fn flag(&self, _stage: Stage, _flag_index: u32) -> bool {
+        panic!("Flag check is not possible for console autosplitter");
+    }
+
+    fn has_item(&self, _item_id: Item) -> bool {
+        panic!("Item check is not implemented for console autosplitter");
     }
 }

@@ -2,7 +2,6 @@ use anyhow::{Result, bail};
 use opencv::prelude::*;
 use opencv::core::{CV_32F, CV_8UC1, CV_8UC3, CV_32FC1, Point3_, Rect, Size, ElemMul, sum_elems};
 use opencv::highgui::{destroy_all_windows, imshow, wait_key_def};
-use opencv::imgcodecs::{IMREAD_GRAYSCALE, IMREAD_COLOR, imread};
 use opencv::imgproc::{COLOR_BGR2GRAY, cvt_color, resize_def};
 use serde::{Deserialize, Serialize};
 
@@ -103,48 +102,60 @@ fn debug_show(mat: &Mat) -> Result<()> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ReferenceImage {
-    image: Mat,
+pub struct MaskedImage(Mat);
+
+#[derive(Debug, Clone)]
+pub struct MaskImage {
     mask: Mat,
-    mask_sum: f64,
+    sum: f64,
+}
+
+impl MaskImage {
+    pub fn new(mask: Mat) -> Result<Self> {
+        let mask = gray_float(mask)?;
+        let sum = sum_elems(&mask)?.0[0];
+
+        Ok(Self { mask, sum })
+    }
+    
+    pub fn mask(&self, image: &Mat) -> Result<MaskedImage> {
+        if image.typ() != CV_32FC1 {
+            bail!("Image must be 32-bit floating point grayscale");
+        }
+        
+        let image = image.elem_mul(&self.mask).into_result()?;
+        let image = (&image - (sum_elems(&image)? / self.sum)).into_result()?;
+        Ok(MaskedImage(image.to_mat()?))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ReferenceImage {
+    image: MaskedImage,
     image_square_sum: f64,
 }
 
 impl ReferenceImage {
-    pub fn new(image: Mat, mask: Mat) -> Result<Self> {
-        let image = gray_float(image)?;
-        let mask = gray_float(mask)?;
-
+    pub fn new(image: MaskedImage) -> Result<Self> {
         // pre-calculate what we can
-        let mask_sum = sum_elems(&mask)?.0[0];
-        let image = image.elem_mul(&mask).into_result()?;
-        let image = (&image - (sum_elems(&image)? / mask_sum)).into_result()?.to_mat()?;
-        let image_square_sum = sum_elems_square(&image)?;
+        let image_square_sum = sum_elems_square(&image.0)?;
 
         Ok(Self {
             image,
-            mask,
-            mask_sum,
             image_square_sum,
         })
     }
 
-    pub fn is_match_to(&self, capture: &Mat) -> Result<bool> {
-        if capture.typ() != CV_32FC1 {
-            bail!("Capture must be 32-bit floating point grayscale");
-        }
-
+    pub fn is_match_to(&self, capture: &MaskedImage) -> Result<bool> {
         // apply mask
-        let capture = capture.elem_mul(&self.mask).into_result()?;
-        let capture = (&capture - (sum_elems(&capture)? / self.mask_sum)).into_result()?.to_mat()?;
-        let capture_square_sum = sum_elems_square(&capture)?;
+        let capture_square_sum = sum_elems_square(&capture.0)?;
 
         let denom = (capture_square_sum * self.image_square_sum).sqrt();
         if denom == 0.0 {
             return Ok(false);
         }
 
-        let num = sum_elems(&capture.elem_mul(&self.image).into_result()?)?.0[0];
+        let num = sum_elems(&(&capture.0).elem_mul(&self.image.0).into_result()?)?.0[0];
 
         Ok((num / denom) > MATCH_THRESHOLD)
     }
@@ -192,6 +203,18 @@ impl CaptureTransform {
             brh: self.bg_roi.height,
         }
     }
+
+    pub fn transform_bg(&self, mat: &Mat) -> Result<Mat> {
+        crop(mat, self.bg_roi.x, self.bg_roi.y, self.bg_roi.width, self.bg_roi.height)
+    }
+
+    pub fn transform_capture(&self, mat: &Mat) -> Result<Mat> {
+        let mut grayscale = Mat::default();
+        cvt_color(mat, &mut grayscale, COLOR_BGR2GRAY, 0)?;
+        let grayscale = gray_float(grayscale)?;
+        let cropped = crop(&grayscale, self.capture_roi.x, self.capture_roi.y, self.capture_roi.width, self.capture_roi.height)?;
+        scale_to(&cropped, self.bg_roi.width, self.bg_roi.height)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -235,7 +258,6 @@ impl CaptureImage {
         // combinations of cropping off up to a few percent around the edges and see which one
         // yields the best match
         let mut best_match = (-1.0, Rect::default());
-        let mut num_iterations = 0;
         for width in MIN_SEARCH_WIDTH..=BACKGROUND_WIDTH {
             for height in MIN_SEARCH_HEIGHT..=BACKGROUND_HEIGHT {
                 let capture = scale_to(&grayscale, width, height)?;
@@ -251,8 +273,6 @@ impl CaptureImage {
                         if score > best_match.0 {
                             best_match = (score, Rect::new(x, y, width, height));
                         }
-
-                        num_iterations += 1;
                     }
                 }
             }
@@ -262,8 +282,11 @@ impl CaptureImage {
             bail!("Capture did not match reference image");
         }
 
-        println!("Num iterations: {}, ZNCC: {}", num_iterations, best_match.0);
-
         Ok(CaptureTransform::new(capture_roi, best_match.1))
+    }
+
+    pub fn transform(&self, transform: &CaptureTransform, mask: &MaskImage) -> Result<MaskedImage> {
+        let transformed = transform.transform_capture(&self.0)?;
+        mask.mask(&transformed)
     }
 }

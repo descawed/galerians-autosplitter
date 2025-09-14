@@ -6,8 +6,9 @@ use clap::{Parser, ValueEnum};
 mod autosplitter;
 use autosplitter::AutoSplitter;
 mod game;
+mod image;
 mod lss;
-mod shmem;
+mod platform;
 mod splits;
 use splits::{Event, DOOR_SPLITS, KEY_EVENT_SPLITS};
 

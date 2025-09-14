@@ -154,6 +154,11 @@ for stage in Stage:
 
                 origin_map_index = None
                 origin_room_index = entrance.room_index
+                if room_name == 'A15RC' and origin_room_index == 16:
+                    # this seems like it should be the entrance for coming up the stairs behind the shutter, but
+                    # neither the room index nor the position match, and there's no other entrance that seems to
+                    # correspond to the actual spawn location
+                    origin_room_index = 10
 
                 # the entrance doesn't record the origin map, so we'll check the given room index in each map in the
                 # stage to see if we can identify the one that links here
@@ -224,6 +229,9 @@ for stage in Stage:
                 elif room_name == 'D1001' and origin_room_index in [3, 6]:
                     # you enter this room with a special cutscene camera angle, so we need to override the detected one
                     camera_index = 0
+                elif room_name == 'A15RC' and origin_room_index == 10:
+                    # entrance data seems bogus as mentioned above
+                    camera_index = 7
 
                 # with the camera angle, we can now identify the background image
                 camera_key = (map_room.module_index, camera_index)

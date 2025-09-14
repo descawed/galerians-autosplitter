@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 const GRAYSCALE_NORM: f64 = 1.0 / 255.0;
 const BLACK_MAX: u8 = 10;
 const MATCH_THRESHOLD: f64 = 0.6;
-const BACKGROUND_WIDTH: i32 = 320;
-const BACKGROUND_HEIGHT: i32 = 240;
+pub const BACKGROUND_WIDTH: i32 = 320;
+pub const BACKGROUND_HEIGHT: i32 = 240;
 const SEARCH_X: i32 = 12;
 const SEARCH_Y: i32 = 9;
 const MIN_SEARCH_WIDTH: i32 = BACKGROUND_WIDTH - SEARCH_X;
@@ -117,12 +117,12 @@ impl MaskImage {
 
         Ok(Self { mask, sum })
     }
-    
+
     pub fn mask(&self, image: &Mat) -> Result<MaskedImage> {
         if image.typ() != CV_32FC1 {
             bail!("Image must be 32-bit floating point grayscale");
         }
-        
+
         let image = image.elem_mul(&self.mask).into_result()?;
         let image = (&image - (sum_elems(&image)? / self.sum)).into_result()?;
         Ok(MaskedImage(image.to_mat()?))

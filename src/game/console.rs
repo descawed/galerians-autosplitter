@@ -146,6 +146,10 @@ impl ConsoleGame {
         Ok(Self::new(capture_device, transform, hud_mask, bg_map, black_screen))
     }
 
+    fn is_in_final_boss_room(&self) -> bool {
+        (self.current_map, self.current_room) == FINAL_BOSS_ROOM
+    }
+
     fn set_room(&mut self, map: Map, room: u16) -> Result<()> {
         if map == self.current_map && room == self.current_room && !self.current_links.is_empty() {
             return Ok(());
@@ -155,11 +159,15 @@ impl ConsoleGame {
         self.current_room = room;
         self.has_defeated_final_boss = false;
 
+        self.current_links.clear();
         let Some(links) = self.bg_map.get(&(self.current_map, self.current_room)) else {
+            if self.is_in_final_boss_room() {
+                // don't expect any rooms after the final boss
+                return Ok(());
+            }
             bail!("No room links for room {} {}", self.current_map as u16, self.current_room);
         };
 
-        self.current_links.clear();
         for (dest_map, dest_room, bg_path) in links {
             let bg_image = load_gray(bg_path.to_string_lossy())?;
             let bg_image = self.transform.transform_bg(&bg_image)?;
@@ -187,7 +195,7 @@ impl ConsoleGame {
 
         // if the player is in the final boss room, check for game completion by detecting the fade
         // to black
-        if (self.current_map, self.current_room) == FINAL_BOSS_ROOM && !self.has_defeated_final_boss {
+        if self.is_in_final_boss_room() && !self.has_defeated_final_boss {
             // TODO: make sure this doesn't trigger too early, as this room is pretty dark to begin with
             if self.black_screen.is_match_to(&capture)? {
                 self.has_defeated_final_boss = true;

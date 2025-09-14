@@ -102,6 +102,7 @@ pub struct ConsoleGame {
     current_links: Vec<(Map, u16, ReferenceImage)>,
     has_defeated_final_boss: bool,
     is_at_main_menu: bool,
+    is_new_game_start: bool,
 }
 
 impl ConsoleGame {
@@ -125,6 +126,7 @@ impl ConsoleGame {
             current_links: Vec::new(),
             has_defeated_final_boss: false,
             is_at_main_menu: false,
+            is_new_game_start: false,
         }
     }
 
@@ -170,6 +172,7 @@ impl ConsoleGame {
         self.current_room = room;
         self.has_defeated_final_boss = false;
         self.is_at_main_menu = false;
+        self.is_new_game_start = false;
 
         self.current_links.clear();
         let Some(links) = self.bg_map.get(&(self.current_map, self.current_room)) else {
@@ -209,7 +212,7 @@ impl ConsoleGame {
         // if the player is in the final boss room, check for game completion by detecting the fade
         // to black
         if self.is_in_final_boss_room() && !self.has_defeated_final_boss {
-            // TODO: make sure this doesn't trigger too early, as this room is pretty dark to begin with
+            // TODO: make sure this doesn't trigger too early; this room is pretty dark to begin with
             // FIXME: this would also trigger if the player dies
             if self.black_screen.is_match_to(&capture)? {
                 self.has_defeated_final_boss = true;
@@ -217,11 +220,25 @@ impl ConsoleGame {
             }
         }
 
-        // lastly, check if the player is at the main menu
+        // if we're at the main menu, check for the start of a new game
         let capture = MaskedImage::unmasked(trans_capture);
-        if self.main_menu.is_match_to(&capture)? {
-            self.set_room(Map::Hospital15F, 0)?;
-            self.is_at_main_menu = true;
+        if self.is_at_main_menu && !self.is_new_game_start {
+            // FIXME: this would also trigger if the trailer starts playing
+            if self.black_screen.is_match_to(&capture)? {
+                self.is_at_main_menu = false;
+                self.is_new_game_start = true;
+                log::debug!("New game start");
+                return Ok(());
+            }
+        }
+
+        // lastly, check if the player is at the main menu
+        if !self.is_at_main_menu {
+            if self.main_menu.is_match_to(&capture)? {
+                self.set_room(Map::Hospital15F, 0)?;
+                log::debug!("At main menu");
+                self.is_at_main_menu = true;
+            }
         }
 
         Ok(())
@@ -245,6 +262,10 @@ impl Game for ConsoleGame {
 
     fn is_at_main_menu(&self) -> bool {
         self.is_at_main_menu
+    }
+
+    fn is_new_game_start(&self) -> bool {
+        self.is_new_game_start
     }
 
     fn map_id(&self) -> u16 {

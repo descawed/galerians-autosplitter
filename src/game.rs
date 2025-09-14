@@ -1,11 +1,14 @@
+use std::fmt::Debug;
+
 use anyhow::Result;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::platform::PlatformRef;
 
 mod console;
-mod emulator;
+pub use console::ConsoleGame;
 
+mod emulator;
 pub use emulator::EmulatorGame;
 
 // silencing "unused" warnings on these enums. even if all the possible values aren't used today,
@@ -88,7 +91,7 @@ pub enum GameState {
     Disconnected,
 }
 
-pub trait Game {
+pub trait Game: Debug {
     /// Update our information on the game state from the connected game instance
     fn update(&mut self) -> GameState;
     

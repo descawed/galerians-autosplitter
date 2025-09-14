@@ -52,24 +52,6 @@ fn scale_to(mat: &Mat, width: i32, height: i32) -> Result<Mat> {
     Ok(scaled)
 }
 
-fn scale_by(mat: &Mat, sx: f64, sy: f64) -> Result<Mat> {
-    let scale_width = (mat.cols() as f64 * sx) as i32;
-    let scale_height = (mat.rows() as f64 * sy) as i32;
-    scale_to(mat, scale_width, scale_height)
-}
-
-fn scale_and_crop(mat: &Mat, sx: f64, sy: f64, output_width: i32, output_height: i32) -> Result<Mat> {
-    // scaling down not supported because we don't need it - the capture can't have MORE background
-    // than the background image itself
-    assert!(sx >= 1.0 && sy >= 1.0);
-
-    let scaled = scale_by(mat, sx, sy)?;
-
-    let x_offset = (scaled.cols() - output_width) / 2;
-    let y_offset = (scaled.rows() - output_height) / 2;
-    crop(&scaled, x_offset, y_offset, output_width, output_height)
-}
-
 fn zncc(capture: &Mat, reference: &Mat, mask: &Mat) -> Result<f64> {
     let mask_sum = sum_elems(&mask)?.0[0];
 

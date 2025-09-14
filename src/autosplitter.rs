@@ -6,9 +6,9 @@ use std::time::Duration;
 use anyhow::Result;
 
 use crate::SplitType;
-use crate::game::{EmulatorGame, Game, GameState};
+use crate::game::{ConsoleGame, EmulatorGame, Game, GameState};
 use crate::lss::{LiveSplit, TimerPhase};
-use crate::platform::{Platform, PlatformRef, PlatformInterface};
+use crate::platform::{Platform, PlatformRef};
 use crate::splits::Event;
 
 const CONNECTION_RETRY_DURATION: Duration = Duration::from_millis(1000);
@@ -19,7 +19,6 @@ const SECOND_ROOM: (u16, u16) = (0, 1);
 const FINAL_BOSS_ROOM: (u16, u16) = (8, 7);
 
 const LIVE_SPLIT_KEEP_ALIVE: i32 = 334; // ~5 seconds at the default update frequency
-const GAME_KEEP_ALIVE: i32 = 200; // ~3 seconds at the default update frequency
 
 const SPLIT_TYPE_VARIABLE_NAME: &str = "GaleriansSplitType";
 
@@ -99,17 +98,29 @@ fn wait_for_live_split(port: u16) -> LiveSplit {
     }
 }
 
+fn get_live_split_split_type(live_split: &mut LiveSplit) -> Result<Option<SplitType>> {
+    let Some(str_split_type) = live_split.get_custom_variable_value(SPLIT_TYPE_VARIABLE_NAME)? else {
+        return Ok(None);
+    };
+
+    let Ok(split_type) = SplitType::try_from(str_split_type.as_str()) else {
+        log::warn!("LiveSplit reported unrecognized split type {str_split_type}; ignoring");
+        return Ok(None);
+    };
+
+    Ok(Some(split_type))
+}
+
 #[derive(Debug)]
 pub struct AutoSplitter {
     connection_state: ConnectionState,
     update_frequency: Duration,
     live_split: LiveSplit,
-    game: EmulatorGame,
+    game: Box<dyn Game>,
     platform: PlatformRef,
     run_state: RunState,
     last_room: (u16, u16),
     live_split_keep_alive: KeepAliveCounter,
-    game_keep_alive: KeepAliveCounter,
     requested_split_type: Option<SplitType>,
     effective_split_type: Option<SplitType>,
     last_reported_split_type: Option<SplitType>,
@@ -117,16 +128,35 @@ pub struct AutoSplitter {
 }
 
 impl AutoSplitter {
-    pub fn create(update_frequency: Duration, live_split_port: u16, requested_split_type: Option<SplitType>) -> Self {
-        let live_split = wait_for_live_split(live_split_port);
+    pub fn create(
+        update_frequency: Duration,
+        live_split_port: u16,
+        capture_device: i32,
+        force_calibrate: bool,
+        requested_split_type: Option<SplitType>,
+    ) -> Result<Self> {
+        let mut live_split = wait_for_live_split(live_split_port);
+        let is_console = match requested_split_type {
+            Some(split_type) => split_type.is_console(),
+            None => {
+                match get_live_split_split_type(&mut live_split)? {
+                    Some(split_type) => split_type.is_console(),
+                    None => false,
+                }
+            }
+        };
 
         let platform = Rc::new(RefCell::new(Platform::new(PROCESS_REFRESH_INTERVAL)));
 
-        let game = EmulatorGame::connect(&platform);
+        let game: Box<dyn Game> = if is_console {
+            Box::new(ConsoleGame::connect(capture_device, force_calibrate)?)
+        } else {
+            Box::new(EmulatorGame::connect(&platform))
+        };
 
         log::info!("Autosplitter is ready to go");
 
-        Self {
+        Ok(Self {
             connection_state: ConnectionState::Connected,
             update_frequency,
             live_split,
@@ -136,12 +166,11 @@ impl AutoSplitter {
             last_room: (0, 0),
             // need to trigger LiveSplit sync on first update so split type is set
             live_split_keep_alive: KeepAliveCounter::new(LIVE_SPLIT_KEEP_ALIVE).with_trigger_on_start(),
-            game_keep_alive: KeepAliveCounter::new(GAME_KEEP_ALIVE),
             requested_split_type,
             effective_split_type: None,
             last_reported_split_type: None,
             splits: None,
-        }
+        })
     }
 
     fn current_room(&self) -> (u16, u16) {
@@ -200,16 +229,7 @@ impl AutoSplitter {
     }
     
     fn get_live_split_split_type(&mut self) -> Result<Option<SplitType>> {
-        let Some(str_split_type) = self.live_split.get_custom_variable_value(SPLIT_TYPE_VARIABLE_NAME)? else {
-            return Ok(None);
-        };
-        
-        let Ok(split_type) = SplitType::try_from(str_split_type.as_str()) else {
-            log::warn!("LiveSplit reported unrecognized split type {str_split_type}; ignoring");
-            return Ok(None);
-        };
-        
-        Ok(Some(split_type))
+        get_live_split_split_type(&mut self.live_split)
     }
     
     fn sync_split_type(&mut self) -> Result<()> {

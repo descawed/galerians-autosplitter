@@ -10,7 +10,7 @@ mod image;
 mod lss;
 mod platform;
 mod splits;
-use splits::{Event, DOOR_SPLITS, KEY_EVENT_SPLITS};
+use splits::{Event, CONSOLE_DOOR_SPLITS, DOOR_SPLITS, KEY_EVENT_SPLITS};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum SplitType {
@@ -20,14 +20,19 @@ enum SplitType {
     RouteDoors,
     /// Split on specific key events - key item pickups, bosses, and hotel progression events
     KeyEvents,
+    /// For console: split on all doors
+    AllDoorsConsole,
+    /// For console: split on doors, but only when the door is the expected next door in the route
+    RouteDoorsConsole,
 }
 
 impl SplitType {
     const fn splits(&self) -> Option<&'static [Event]> {
         match self {
-            Self::AllDoors => None,
+            Self::AllDoors | Self::AllDoorsConsole => None,
             Self::RouteDoors => Some(&DOOR_SPLITS),
             Self::KeyEvents => Some(&KEY_EVENT_SPLITS),
+            Self::RouteDoorsConsole => Some(&CONSOLE_DOOR_SPLITS),
         }
     }
 
@@ -36,7 +41,13 @@ impl SplitType {
             Self::AllDoors => "all-doors",
             Self::RouteDoors => "route-doors",
             Self::KeyEvents => "key-events",
+            Self::AllDoorsConsole => "all-doors-console",
+            Self::RouteDoorsConsole => "route-doors-console",
         }
+    }
+
+    const fn is_console(&self) -> bool {
+        matches!(self, Self::AllDoorsConsole | Self::RouteDoorsConsole)
     }
 }
 
@@ -48,6 +59,8 @@ impl TryFrom<&str> for SplitType {
             "AllDoors" | "all-doors" => Ok(Self::AllDoors),
             "RouteDoors" | "route-doors" => Ok(Self::RouteDoors),
             "KeyEvents" | "key-events" => Ok(Self::KeyEvents),
+            "AllDoorsConsole" | "all-doors-console" => Ok(Self::AllDoorsConsole),
+            "RouteDoorsConsole" | "route-doors-console" => Ok(Self::RouteDoorsConsole),
             _ => Err(anyhow!("Unknown split type: {value}")),
         }
     }
@@ -62,6 +75,13 @@ struct Cli {
     /// How often to update the state of the game in milliseconds
     #[arg(short, long, default_value_t = 15)]
     update_frequency: u64,
+    /// When doing console runs, the index of the video capture device to use
+    #[arg(short, long, default_value_t = 0)]
+    capture_device: i32,
+    /// When doing console runs, force capture calibration even if the specified video capture
+    /// device has already been calibrated
+    #[arg(short, long, default_value_t = false)]
+    force_calibrate: bool,
     /// Strategy for when to split. If not provided, it will be determined from LiveSplit's split
     /// settings if possible. If the LiveSplit split settings also don't have a valid split type,
     /// defaults to all-doors.
@@ -79,7 +99,9 @@ fn main() -> Result<()> {
     let mut splitter = AutoSplitter::create(
         update_duration,
         args.live_split_port,
+        args.capture_device,
+        args.force_calibrate,
         args.split_type,
-    );
+    )?;
     splitter.update()
 }

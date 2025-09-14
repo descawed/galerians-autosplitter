@@ -140,15 +140,11 @@ impl EmulatorGame {
     pub const fn new(version: &'static GameVersion, emulator: Emulator) -> Self {
         Self { version, emulator }
     }
-    
+
     pub fn connect(platform: &PlatformRef) -> Self {
         let mut emulator = wait_for_emulator(&platform);
         let version = wait_for_version(&mut emulator, &platform);
         Self::new(version, emulator)
-    }
-
-    pub fn version_name(&self) -> &'static str {
-        self.version.name
     }
 
     pub fn main_menu_state(&self) -> i32 {
@@ -212,12 +208,12 @@ impl Game for EmulatorGame {
         Ok(())
     }
 
-    fn is_new_game_start(&self) -> bool {
-        (NEW_GAME_MENU_STATE..TRAILER_MENU_STATE).contains(&self.main_menu_state())
-    }
-
     fn is_at_main_menu(&self) -> bool {
         (0..NEW_GAME_MENU_STATE).contains(&self.main_menu_state())
+    }
+
+    fn is_new_game_start(&self) -> bool {
+        (NEW_GAME_MENU_STATE..TRAILER_MENU_STATE).contains(&self.main_menu_state())
     }
 
     fn map_id(&self) -> u16 {

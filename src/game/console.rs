@@ -9,10 +9,12 @@ use opencv::videoio::VideoCapture;
 
 use super::{Game, GameState, Item, Map, Stage};
 use crate::image::{
+    MATCH_THRESHOLD,
     CaptureImage, CaptureTransform, CaptureTransformJson, MaskImage, MaskedImage, ReferenceImage,
     gray_float, is_fade_out,
 };
 use crate::platform::PlatformRef;
+use crate::splits::Event;
 
 const DEVICE_SETTINGS_PATH: &str = "device.json";
 const BACKGROUND_PATH: &str = "assets/backgrounds/";
@@ -154,6 +156,8 @@ impl ConsoleGame {
             return Ok(());
         }
 
+        log::debug!("Room {map:?} {room}");
+
         self.current_map = map;
         self.current_room = room;
         self.has_defeated_final_boss = false;
@@ -180,7 +184,7 @@ impl ConsoleGame {
         Ok(())
     }
 
-    fn check_frame(&mut self) -> Result<()> {
+    fn check_frame(&mut self, route_hint: Option<&Event>) -> Result<()> {
         let mut frame = Mat::default();
         self.capture_device.read(&mut frame)?;
 
@@ -188,11 +192,36 @@ impl ConsoleGame {
         let trans_capture = capture_image.transform(&self.transform)?;
         let capture = self.hud_mask.mask(&trans_capture)?;
 
+        let mut best_match = None;
         for (dest_map, dest_room, reference_image) in &self.current_links {
-            if reference_image.is_match_to(&capture)? {
-                self.set_room(*dest_map, *dest_room)?;
-                return Ok(());
+            let score = reference_image.match_score(&capture)?;
+            if score > MATCH_THRESHOLD {
+                // if one of the matches is the expected next room, always take that one
+                let route_match = match route_hint {
+                    Some(Event::Room(route_map, route_room)) => (*route_map, *route_room) == (*dest_map, *dest_room),
+                    Some(Event::Room2((route_map1, route_room1), (route_map2, route_room2))) => {
+                        (*route_map1, *route_room1) == (*dest_map, *dest_room) || (*route_map2, *route_room2) == (*dest_map, *dest_room)
+                    }
+                    _ => false,
+                };
+                if route_match {
+                    best_match = Some((1.0, *dest_map, *dest_room));
+                    break;
+                }
+                // if not, take the match with the highest score
+                let is_best = match best_match {
+                    Some((best_score, _, _)) => score > best_score,
+                    None => true,
+                };
+                if is_best {
+                    best_match = Some((score, *dest_map, *dest_room));
+                }
             }
+        }
+
+        if let Some((_, dest_map, dest_room)) = best_match {
+            self.set_room(dest_map, dest_room)?;
+            return Ok(());
         }
 
         // if the player is in the final boss room, check for game completion by detecting the fade
@@ -233,8 +262,8 @@ impl ConsoleGame {
 }
 
 impl Game for ConsoleGame {
-    fn update(&mut self) -> GameState {
-        match self.check_frame() {
+    fn update(&mut self, route_hint: Option<&Event>) -> GameState {
+        match self.check_frame(route_hint) {
             Ok(_) => GameState::Connected,
             Err(e) => {
                 log::error!("Failed to check next capture frame: {e}");

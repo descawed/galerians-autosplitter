@@ -18,7 +18,7 @@ use crate::splits::Event;
 
 const DEVICE_SETTINGS_PATH: &str = "device.json";
 const BACKGROUND_PATH: &str = "assets/backgrounds/";
-const CALIBRATION_IMAGE_PATH: &str = "assets/backgrounds/A1501_4.png";
+const CALIBRATION_IMAGE_PATH: &str = "assets/backgrounds/A1501_4_0.png";
 const HUD_MASK_PATH: &str = "assets/backgrounds/hud_mask.png";
 const MAIN_MENU_PATH: &str = "assets/backgrounds/main_menu.png";
 const BG_MAP_PATH: &str = "assets/backgrounds/bg_map.json";

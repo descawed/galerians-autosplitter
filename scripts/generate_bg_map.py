@@ -7,6 +7,7 @@ directory.
 
 import json
 import sys
+from collections import defaultdict
 from enum import IntEnum
 from pathlib import Path
 
@@ -90,7 +91,7 @@ class BackgroundMap:
         self.output_dir = output_dir
         self.maps = self.project.get_maps()
         self.room_modules = RoomModules(project)
-        self.bg_map = {}
+        self.bg_map = defaultdict(set)
         self.camera_images = {}
 
     def add_link(self,
@@ -98,34 +99,12 @@ class BackgroundMap:
                  current_map_index: int, current_room_index: int,
                  room: RoomModule, module_index: int,
                  bg_manifest: Manifest, camera_index: int,
+                 bg_set_index: int = 0,
                  ):
         room_name = get_room_name(room, module_index)
 
-        bg_set_index = 0
-        if len(room.backgrounds) > 1 and room_name != 'C0102':
-            # most rooms in the game only have a single background set, but the rooms in the game where the lights
-            # can turn off have two. we generally want the one with the lights on, which is the second set for all
-            # except C0102.
-            bg_set_index = 1
-
-        if room_name == 'D0003' and origin_room_index == 1:
-            # having trouble with overlapping cuts
-            camera_index = 6
-        elif room_name == 'D1001' and origin_room_index in [3, 6]:
-            # you enter this room with a special cutscene camera angle, so we need to override the detected one
-            camera_index = 0
-        elif room_name == 'A15RC' and origin_room_index == 10:
-            # entrance data seems bogus as mentioned above
-            camera_index = 7
-
-        # A1310 has two map entries; normalize them to a single one
-        if origin_map_index == Map.HOSPITAL_13F and origin_room_index == 10:
-            origin_room_index = 9
-        if current_map_index == Map.HOSPITAL_13F and current_room_index == 10:
-            current_room_index = 9
-
         # with the camera angle, we can now identify the background image
-        camera_key = (module_index, camera_index)
+        camera_key = (module_index, camera_index, bg_set_index)
         if camera_key in self.camera_images:
             bg_path = self.camera_images[camera_key]
         else:
@@ -137,7 +116,7 @@ class BackgroundMap:
             bg_description = room.backgrounds[bg_set_index].backgrounds[camera_index]
             bg_view_manifest = bg_manifest.get_manifest(bg_description.index)
             bg_tim = bg_view_manifest.load_file(db_index, TimFormat).obj
-            bg_path = self.output_dir / f"{room_name}_{camera_index}.png"
+            bg_path = self.output_dir / f"{room_name}_{camera_index}_{bg_set_index}.png"
 
             if room_name == 'B0112' and camera_index == 1:
                 # this room has an animated sky texture that we need to underlay behind the main background
@@ -166,7 +145,13 @@ class BackgroundMap:
             self.camera_images[camera_key] = bg_path
         self.bg_map[
             (origin_map_index, origin_room_index, current_map_index, current_room_index)
-        ] = bg_path.name
+        ].add(bg_path.name)
+
+    def save_map(self, filename: str):
+        json_bg_map = [(link, image) for link, images in self.bg_map.items() for image in images]
+
+        with (self.output_dir / filename).open('w') as f:
+            json.dump(json_bg_map, f)
 
     def map_rooms(self):
         for stage in Stage:
@@ -366,17 +351,61 @@ class BackgroundMap:
                             print(f"WARNING: could not find camera for entrance {entrance_index} in {room_name}")
                             continue
 
+                        bg_set_index = 0
+                        if len(room.backgrounds) > 1 and room_name != 'C0102':
+                            # most rooms in the game only have a single background set, but the rooms in the game where the lights
+                            # can turn off have two. we generally want the one with the lights on, which is the second set for all
+                            # except C0102.
+                            bg_set_index = 1
+
+                        if room_name == 'D0003' and origin_room_index == 1:
+                            # having trouble with overlapping cuts
+                            camera_index = 6
+                        elif room_name == 'A15RC' and origin_room_index == 10:
+                            # entrance data seems bogus as mentioned above
+                            camera_index = 7
+
+                        # A1310 has two map entries; normalize them to a single one
+                        if origin_map_index == Map.HOSPITAL_13F and origin_room_index == 10:
+                            origin_room_index = 9
+                        if current_map_index == Map.HOSPITAL_13F and current_room_index == 10:
+                            current_room_index = 9
+
                         self.add_link(
                             origin_map_index, origin_room_index,
                             current_map_index, current_room_index,
                             room, map_room.module_index,
                             bg_manifest, camera_index,
+                            bg_set_index,
                         )
 
-        json_bg_map = list(self.bg_map.items())
-        with (self.output_dir / "bg_map.json").open('w') as f:
-            json.dump(json_bg_map, f)
+                        if room_name == 'B0110' and camera_index == 8:
+                            # add special cutscene angle for first entrance
+                            self.add_link(
+                                origin_map_index, origin_room_index,
+                                current_map_index, current_room_index,
+                                room, map_room.module_index,
+                                bg_manifest, 7,
+                            )
+                        elif room_name == 'D1001' and origin_room_index in [3, 6]:
+                            # special cutscene angle for first entrance
+                            self.add_link(
+                                origin_map_index, origin_room_index,
+                                current_map_index, current_room_index,
+                                room, map_room.module_index,
+                                bg_manifest, 0,
+                            )
+                        elif room_name == 'C0101' and camera_index == 5:
+                            # for this room, we need both the light and dark backgrounds
+                            self.add_link(
+                                origin_map_index, origin_room_index,
+                                current_map_index, current_room_index,
+                                room, map_room.module_index,
+                                bg_manifest, camera_index,
+                                0,
+                            )
 
 
 bg_mapper = BackgroundMap(Project.open(sys.argv[1]), Path(sys.argv[2]))
 bg_mapper.map_rooms()
+bg_mapper.save_map('bg_map.json')

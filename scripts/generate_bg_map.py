@@ -233,6 +233,12 @@ for stage in Stage:
                     # entrance data seems bogus as mentioned above
                     camera_index = 7
 
+                # A1310 has two map entries; normalize them to a single one
+                if origin_map_index == Map.HOSPITAL_13F and origin_room_index == 10:
+                    origin_room_index = 9
+                if current_map_index == Map.HOSPITAL_13F and current_room_index == 10:
+                    current_room_index = 9
+
                 # with the camera angle, we can now identify the background image
                 camera_key = (map_room.module_index, camera_index)
                 if camera_key in camera_images:

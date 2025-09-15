@@ -224,6 +224,7 @@ impl ConsoleGame {
                 self.set_room(Map::Hospital15F, 0)?;
                 log::debug!("At main menu");
                 self.is_at_main_menu = true;
+                self.is_new_game_start = false;
             }
         }
 

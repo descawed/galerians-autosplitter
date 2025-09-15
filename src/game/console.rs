@@ -70,7 +70,7 @@ fn calibrate(capture_device: &mut VideoCapture, hud_mask: &Mat) -> Result<Captur
 
     let capture_image = CaptureImage::new(frame)?;
     let calibration_image = load_gray(CALIBRATION_IMAGE_PATH)?;
-    capture_image.find_transform(&calibration_image, &hud_mask)
+    capture_image.find_transform(&calibration_image, hud_mask)
 }
 
 fn load_bg_map() -> Result<BackgroundMap> {

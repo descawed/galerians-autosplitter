@@ -262,8 +262,8 @@ impl CaptureImage {
 
                 for x in 0..=x_max {
                     for y in 0..=y_max {
-                        let background = crop(&background, x, y, width, height)?;
-                        let mask = crop(&mask, x, y, width, height)?;
+                        let background = crop(background, x, y, width, height)?;
+                        let mask = crop(mask, x, y, width, height)?;
 
                         let score = zncc(&capture, &background, &mask)?;
                         if score > best_match.0 {

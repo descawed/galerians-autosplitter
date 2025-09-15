@@ -123,7 +123,7 @@ fn wait_for_version(emulator: &mut Emulator, platform: &PlatformRef) -> &'static
             log::info!("Waiting for game to be loaded...");
         }
 
-        if let Some(version) = GameVersion::detect(&emulator) {
+        if let Some(version) = GameVersion::detect(emulator) {
             return version;
         }
 
@@ -143,8 +143,8 @@ impl EmulatorGame {
     }
 
     pub fn connect(platform: &PlatformRef) -> Self {
-        let mut emulator = wait_for_emulator(&platform);
-        let version = wait_for_version(&mut emulator, &platform);
+        let mut emulator = wait_for_emulator(platform);
+        let version = wait_for_version(&mut emulator, platform);
         Self::new(version, emulator)
     }
 

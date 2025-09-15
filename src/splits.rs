@@ -274,3 +274,183 @@ pub const DOOR_SPLITS: [Event; 176] = [
     room!(MushroomTower 4), // D1001 (Cain)
     room!(MushroomTower 7), // D1004 (Dorothy)
 ];
+
+pub const CONSOLE_DOOR_SPLITS: [Event; 171] = [
+    // Stage A
+    room!(Hospital15F 1), // A1502 (security card)
+    room!(Hospital15F 12), // A15RA
+    room!(Hospital15F 2), // A1503 (use security card)
+    room!(Hospital15F 11), // A1512
+    room!(Hospital15F 3), // A1504 (freezer room key)
+    room!(Hospital15F 11), // A1512
+    room!(Hospital15F 13), // A15RB
+    room!(Hospital15F 14), // A15RC
+    room!(Hospital15F 4), // A1505 (PPEC storage key)
+    room!(Hospital15F 14), // A15RC
+    room!(Hospital15F 6), // A1507 (fuse)
+    room!(Hospital15F 14), // A15RC (use fuse)
+    room!(Hospital15F 0), // A1501 (liquid explosive)
+    room!(Hospital15F 14), // A15RC (use liquid explosive)
+    room!(Hospital14F 10), // A14RA
+    room!(Hospital14F 1), // A1402
+    room!(Hospital14F 0), // A1508
+    room!(Hospital14F 8), // A1409 (special PPEC office key)
+    room!(Hospital14F 0), // A1508
+    room!(Hospital14F 1), // A1402
+    room!(Hospital14F 10), // A14RA
+    room!(Hospital15F 14), // A15RC
+    room!(Hospital15F 13), // A15RB (use special PPEC office key)
+    room2!(Hospital15F 7, Hospital14F 5), // A1401 (reformat security card)
+    room!(Hospital15F 13), // A15RB
+    room!(Hospital15F 14), // A15RC
+    room!(Hospital14F 10), // A14RA (use reformatted security card)
+    room!(Hospital14F 12), // A14RF
+    room!(Hospital14F 7), // A1408
+    room!(Hospital13F 15), // A13RA
+    room!(Hospital13F 0), // A1301 (control room key, photo of parents)
+    room!(Hospital13F 15), // A13RA
+    room2!(Hospital13F 9, Hospital13F 10), // A1310
+    room!(Hospital13F 16), // A13RB
+    room!(Hospital13F 1), // A1302 (test lab key)
+    room!(Hospital13F 16), // A13RB
+    room2!(Hospital13F 9, Hospital13F 10), // A1310
+    room!(Hospital14F 13), // A14RG
+    room!(Hospital14F 2), // A1403 (research lab key)
+    room!(Hospital14F 13), // A14RG
+    room2!(Hospital13F 9, Hospital13F 10), // A1310 (use test lab key)
+    room!(Hospital13F 5), // A1306 (two-headed snake)
+    room2!(Hospital13F 9, Hospital13F 10), // A1310 (use control room key)
+    room!(Hospital13F 7), // A1308 (unlock Clinic Chief's office, use research lab key)
+    room!(Hospital13F 8), // A1309 (two-headed monkey)
+    room!(Hospital13F 7), // A1308 (unlock armory)
+    room2!(Hospital13F 9, Hospital13F 10), // A1310
+    room!(Hospital13F 11), // A1312 (two-headed wolf)
+    room2!(Hospital13F 9, Hospital13F 10), // A1310
+    room!(Hospital13F 15), // A13RA
+    room!(Hospital13F 2), // A1303 (two-headed eagle)
+    room!(Hospital13F 3), // A1304
+    room!(Hospital13F 17), // A13RC
+    room!(Hospital13F 4), // A1305
+    room!(Hospital13F 19), // A13RE
+    room!(Hospital14F 18), // A14KD
+    room!(Hospital14F 4), // A1405 (Lem)
+    // Stage B
+    room!(YourHouse1F 11), // B0112
+    room!(YourHouse1F 9), // B0110 (backdoor key, use backdoor key)
+    room!(YourHouse1F 3), // B0104
+    room!(YourHouse1F 12), // B01RA
+    room!(YourHouse1F 5), // B0106 (second floor key)
+    room!(YourHouse1F 12), // B01RA
+    room!(YourHouse1F 13), // B01RB
+    room!(YourHouse1F 14), // B01RC
+    room!(YourHouse1F 7), // B0108 (door knob)
+    room!(YourHouse1F 14), // B01RC
+    room!(YourHouse1F 13), // B01RB
+    room!(YourHouse1F 12), // B01RA
+    room!(YourHouse1F 3), // B0104 (use door knob)
+    room!(YourHouse1F 0), // B0101
+    room!(YourHouse2F 0), // B0201 (use second floor key)
+    room!(YourHouse2F 9), // B02RA
+    room!(YourHouse2F 1), // B0202 (bedroom key)
+    room!(YourHouse2F 9), // B02RA
+    room!(YourHouse2F 10), // B02RB
+    room!(YourHouse2F 11), // B02RC (use bedroom key)
+    room!(YourHouse2F 10), // B02RB
+    room!(YourHouse1F 13), // B01RB
+    room!(YourHouse1F 12), // B01RA
+    room!(YourHouse1F 4), // B0105 (mother's ring)
+    room!(YourHouse1F 12), // B01RA
+    room!(YourHouse1F 3), // B0104
+    room!(YourHouse1F 0), // B0101
+    room!(YourHouse2F 0), // B0201
+    room!(YourHouse2F 9), // B02RA
+    room!(YourHouse2F 10), // B02RB
+    room!(YourHouse2F 11), // B02RC
+    room!(YourHouse2F 6), // B0207 (father's ring, use mother's ring)
+    room!(YourHouse2F 11), // B02RC
+    room!(YourHouse2F 10), // B02RB
+    room!(YourHouse2F 9), // B02RA
+    room!(YourHouse2F 3), // B0204 (use mother's ring, use father's ring)
+    room!(YourHouse2F 2), // B0203 (3 ball)
+    room!(YourHouse2F 3), // B0204
+    room!(YourHouse2F 9), // B02RA
+    room!(YourHouse2F 0), // B0201
+    room!(YourHouse1F 0), // B0101
+    room!(YourHouse1F 11), // B0112
+    room!(YourHouse1F 9), // B0110 (9 ball)
+    room!(YourHouse1F 3), // B0104
+    room!(YourHouse1F 12), // B01RA
+    room!(YourHouse1F 13), // B01RB
+    room!(YourHouse1F 14), // B01RC
+    room!(YourHouse1F 7), // B0108 (use 3 ball, use 9 ball)
+    room!(YourHouse1F 15), // B0001 (shed key)
+    room!(YourHouse1F 7), // B0108
+    room!(YourHouse1F 14), // B01RC
+    room!(YourHouse1F 13), // B01RB
+    room!(YourHouse1F 12), // B01RA
+    room!(YourHouse1F 3), // B0104
+    room!(YourHouse1F 0), // B0101
+    room!(YourHouse1F 11), // B0112
+    room!(YourHouse1F 10), // B0111 (use shed key)
+    room!(YourHouse1F 2), // B0103 (Lilia's doll)
+    room!(YourHouse1F 10), // B0111 (Birdman)
+    // Stage C
+    room!(Hotel1F 0), // C0101 (front desk)
+    room!(Hotel3F 6), // C0307
+    room!(Hotel3F 1), // C0302 (302)
+    room!(Hotel3F 6), // C0307
+    room!(Hotel1F 0), // C0101 (blood trail)
+    room!(Hotel1F 1), // C0102 (staff room)
+    room!(Hotel1F 0), // C0101 (learn knock)
+    room!(Hotel2F 6), // C0207 (knock)
+    room!(Hotel2F 3), // C0204 (Joule, D-Felon)
+    room!(Hotel2F 6), // C0207
+    room!(Hotel2F 0), // C0201 (Crovic)
+    room!(Hotel2F 6), // C0207
+    room!(Hotel2F 5), // C0206 (priest)
+    room!(Hotel2F 6), // C0207
+    room!(Hotel2F 2), // C0203 (bomb guy)
+    room!(Hotel2F 6), // C0207
+    room!(Hotel3F 6), // C0307 (3F rabbit)
+    room!(Hotel3F 3), // C0304 (Suzan)
+    room!(Hotel3F 6), // C0307
+    room!(Hotel3F 2), // C0303
+    room!(Hotel3F 6), // C0307
+    room!(Hotel3F 4), // C0305 (rabbits)
+    room!(Hotel3F 6), // C0307
+    room!(Hotel3F 0), // C0301 (rabbits)
+    room!(Hotel3F 6), // C0307
+    room!(Hotel2F 6), // C0207
+    room!(Hotel2F 4), // C0205 (phone call)
+    room!(Hotel2F 6), // C0207 (rabbits)
+    room!(Hotel2F 1), // C0202 (rabbit)
+    room!(Hotel2F 6), // C0207 (Rainheart cutscene)
+    room!(Hotel3F 6), // C0307
+    room!(Hotel3F 4), // C0305 (Rainheart)
+    room!(Hotel3F 6), // C0307
+    room!(Hotel1F 0), // C0101
+    room!(Hotel1F 1), // C0102 (circuit breaker)
+    room!(Hotel1F 0), // C0101
+    room!(Hotel1F 4), // C1001
+    room!(Hotel1F 6), // C1102
+    room!(Hotel1F 8), // C1104
+    room!(Hotel1F 6), // C1102
+    room!(Hotel1F 5), // C1101 (Rita)
+    // Stage D
+    room!(MushroomTower 0), // D0001
+    room!(MushroomTower 8), // D0101
+    room!(MushroomTower 0), // D0001
+    room!(MushroomTower 1), // D0002
+    room!(MushroomTower 8), // D0101
+    room!(MushroomTower 1), // D0002
+    room!(MushroomTower 2), // D0003
+    room!(MushroomTower 8), // D0101
+    room!(MushroomTower 2), // D0003
+    room!(MushroomTower 3), // D0004
+    room!(MushroomTower 8), // D0101
+    room!(MushroomTower 3), // D0004
+    // I think we might briefly go to D1003 here, but that's just a cutscene, so no need to make it
+    // a split
+    room!(MushroomTower 4), // D1001 (Cain)
+    room!(MushroomTower 7), // D1004 (Dorothy)
+];

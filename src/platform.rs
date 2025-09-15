@@ -178,6 +178,8 @@ impl PlatformInterface for RefCell<Platform> {
     }
 }
 
+pub type PlatformRef = Rc<RefCell<Platform>>;
+
 trait SharedMemoryClient: Debug {
     fn open(name: &str, size: usize) -> Result<Self> where Self: Sized;
 

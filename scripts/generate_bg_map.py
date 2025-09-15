@@ -127,6 +127,12 @@ class BackgroundMap:
                 canvas.paste(sky_image, (0, 0), sky_image)
                 canvas.paste(bg_image, (0, 0), bg_image)
                 bg_image = canvas.convert('RGB')
+            elif room_name == 'C0304' and camera_index == 0:
+                # the mirror is a separate texture
+                bg_image = bg_tim.to_image(transparency=Transparency.NONE)
+                mirror_tim = bg_view_manifest.load_file(6, TimFormat).obj
+                mirror_image = mirror_tim.to_image()
+                bg_image.paste(mirror_image, (207, 89), mirror_image)
             else:
                 bg_image = bg_tim.to_image(transparency=Transparency.NONE)
 

@@ -10,7 +10,7 @@ import sys
 from enum import IntEnum
 from pathlib import Path
 
-from PIL import ImageEnhance
+from PIL import Image, ImageEnhance
 
 from galsdk.game import STAGE_MAPS, Stage
 from galsdk.module import Entrance, RoomModule
@@ -253,7 +253,18 @@ for stage in Stage:
                     bg_view_manifest = bg_manifest.get_manifest(bg_description.index)
                     bg_tim = bg_view_manifest.load_file(db_index, TimFormat).obj
                     bg_path = output_dir / f"{room_name}_{camera_index}.png"
-                    bg_image = bg_tim.to_image(transparency=Transparency.NONE)
+
+                    if room_name == 'B0112' and camera_index == 1:
+                        # this room has an animated sky texture that we need to underlay behind the main background
+                        bg_image = bg_tim.to_image()
+                        sky_tim = bg_view_manifest.load_file(2, TimFormat).obj
+                        sky_image = sky_tim.to_image()
+                        canvas = Image.new('RGBA', bg_image.size, (0, 0, 0, 0))
+                        canvas.paste(sky_image, (0, 0), sky_image)
+                        canvas.paste(bg_image, (0, 0), bg_image)
+                        bg_image = canvas.convert('RGB')
+                    else:
+                        bg_image = bg_tim.to_image(transparency=Transparency.NONE)
 
                     if room_name == 'D1004':
                         # the platform in this room is an overlay, so we need to add it in

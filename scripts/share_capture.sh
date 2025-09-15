@@ -4,13 +4,14 @@ set -euo pipefail
 
 if [[ "$#" -lt 3 ]]
 then
-  echo Usage: "$0" INPUT_INDEX OBS_INDEX AUTOSPLITTER_INDEX '[--delete-existing]' '[--pixel-format fmt]' '[--resolution WxH]'
+  echo Usage: "$0" INPUT_INDEX OBS_INDEX AUTOSPLITTER_INDEX '[--delete-existing]' '[--pixel-format ffmpeg v4l2]' '[--resolution WxH]' '[--fps fps]'
   echo '    INPUT_INDEX: index of the video capture device to share'
   echo '    OBS_INDEX: index of the video capture device to create for OBS'
   echo '    AUTOSPLITTER_INDEX: index of the video capture device to create for the autosplitter'
   echo '    --delete-existing: if an output device has already been created, delete it and make a new one'
-  echo '    --pixel-format: the pixel format of the input capture; default is yuyv422'
+  echo '    --pixel-format: the pixel format of the input capture. You need to provide both the ffmpeg name and the V4L2 fourcc. Default is yuyv422 YUYV.'
   echo '    --resolution: input resolution in the form WxH; default is 1920x1080'
+  echo '    --fps: frame rate of the input capture; default is 60'
   exit 1
 fi
 
@@ -19,8 +20,10 @@ obs_index=$2
 autosplitter_index=$3
 
 delete_existing=false
-pixel_format=yuyv422
+ffmpeg_pixel_format=yuyv422
+v4l2_pixel_format=YUYV
 resolution=1920x1080
+fps=60
 
 shift 3
 while (( "$#" ))
@@ -31,12 +34,17 @@ do
       ;;
     --pixel-format)
       shift
-      pixel_format="$1"
+      ffmpeg_pixel_format="$1"
+      shift
+      v4l2_pixel_format="$1"
       ;;
     --resolution)
       shift
       resolution="$1"
       ;;
+    --fps)
+      shift
+      fps="$1"
   esac
   shift
 done
@@ -66,6 +74,8 @@ create_device() {
     v4l2loopback-ctl add -x 1 -n "$1" "$2"
     echo Device created
   fi
+
+  v4l2loopback-ctl set-caps "$share_device" "$v4l2_pixel_format:$resolution@$fps/1"
 }
 
 if ! grep -wq '^v4l2loopback' /proc/modules
@@ -82,4 +92,7 @@ create_device 'Galerians autosplitter share' "$autosplitter_index"
 autosplitter_device="$share_device"
 
 echo Sharing input capture...
-ffmpeg -nostdin -y -f v4l2 -input_format "$pixel_format" -video_size "$resolution" -i "/dev/video$input_index" -f v4l2 -pix_fmt "$pixel_format" "$obs_device" -f v4l2 -pix_fmt "$pixel_format" "$autosplitter_device"
+ffmpeg -nostdin -y\
+ -f v4l2 -input_format "$ffmpeg_pixel_format" -video_size "$resolution" -i "/dev/video$input_index"\
+ -f v4l2 -pix_fmt "$ffmpeg_pixel_format" "$obs_device"\
+ -f v4l2 -pix_fmt "$ffmpeg_pixel_format" "$autosplitter_device"

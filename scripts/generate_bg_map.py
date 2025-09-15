@@ -11,7 +11,7 @@ from collections import defaultdict
 from enum import IntEnum
 from pathlib import Path
 
-from PIL import Image, ImageEnhance
+from PIL import Image
 
 from galsdk.game import STAGE_MAPS, Stage
 from galsdk.manifest import Manifest
@@ -141,11 +141,6 @@ class BackgroundMap:
                 platform_tim = bg_view_manifest.load_file(1, TimFormat).obj
                 platform_image = platform_tim.to_image()
                 bg_image.paste(platform_image, (6, 164), platform_image)
-
-                # secondly, the unmodified image is only displayed during the lightning flashes; the normal
-                # background is a darkened version of this image. so, we need to darken ours too.
-                enhancer = ImageEnhance.Brightness(bg_image)
-                bg_image = enhancer.enhance(0.2)
 
             bg_image.save(bg_path)
             self.camera_images[camera_key] = bg_path

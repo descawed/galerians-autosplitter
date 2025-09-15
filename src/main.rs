@@ -20,8 +20,10 @@ enum SplitType {
     RouteDoors,
     /// Split on specific key events - key item pickups, bosses, and hotel progression events
     KeyEvents,
-    /// For console: split on all doors
-    AllDoorsConsole,
+    // this option is disabled for now because we can't reliably tell the difference between some of
+    // the rooms in the hotel, which can lead to the autosplitter getting stuck
+    /*/// For console: split on all doors
+    AllDoorsConsole,*/
     /// For console: split on doors, but only when the door is the expected next door in the route
     RouteDoorsConsole,
 }
@@ -29,7 +31,7 @@ enum SplitType {
 impl SplitType {
     const fn splits(&self) -> Option<&'static [Event]> {
         match self {
-            Self::AllDoors | Self::AllDoorsConsole => None,
+            Self::AllDoors /*| Self::AllDoorsConsole*/ => None,
             Self::RouteDoors => Some(&DOOR_SPLITS),
             Self::KeyEvents => Some(&KEY_EVENT_SPLITS),
             Self::RouteDoorsConsole => Some(&CONSOLE_DOOR_SPLITS),
@@ -41,13 +43,13 @@ impl SplitType {
             Self::AllDoors => "all-doors",
             Self::RouteDoors => "route-doors",
             Self::KeyEvents => "key-events",
-            Self::AllDoorsConsole => "all-doors-console",
+            //Self::AllDoorsConsole => "all-doors-console",
             Self::RouteDoorsConsole => "route-doors-console",
         }
     }
 
     const fn is_console(&self) -> bool {
-        matches!(self, Self::AllDoorsConsole | Self::RouteDoorsConsole)
+        matches!(self, /*Self::AllDoorsConsole |*/ Self::RouteDoorsConsole)
     }
 }
 
@@ -59,7 +61,7 @@ impl TryFrom<&str> for SplitType {
             "AllDoors" | "all-doors" => Ok(Self::AllDoors),
             "RouteDoors" | "route-doors" => Ok(Self::RouteDoors),
             "KeyEvents" | "key-events" => Ok(Self::KeyEvents),
-            "AllDoorsConsole" | "all-doors-console" => Ok(Self::AllDoorsConsole),
+            // "AllDoorsConsole" | "all-doors-console" => Ok(Self::AllDoorsConsole),
             "RouteDoorsConsole" | "route-doors-console" => Ok(Self::RouteDoorsConsole),
             _ => Err(anyhow!("Unknown split type: {value}")),
         }

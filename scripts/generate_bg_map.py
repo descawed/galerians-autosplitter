@@ -198,6 +198,14 @@ class BackgroundMap:
                             room, map_room.module_index,
                             bg_manifest, 0,
                         )
+                    elif room_name == 'B01RB':
+                        # falling through the hole
+                        self.add_link(
+                            Map.YOUR_HOUSE_2F, 10,
+                            current_map_index, current_room_index,
+                            room, map_room.module_index,
+                            bg_manifest, 0,
+                        )
 
                     if len(room.entrances) == 0:
                         # some rooms have entrances we can't detect automatically, so we have to define them manually

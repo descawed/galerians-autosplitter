@@ -1,13 +1,12 @@
 use anyhow::{Result, bail};
 use opencv::prelude::*;
 use opencv::core::{CV_32F, CV_8UC1, CV_8UC3, CV_32FC1, Point3_, Rect, Size, ElemMul, sum_elems};
-use opencv::highgui::{destroy_all_windows, imshow, wait_key_def};
+//use opencv::highgui::{destroy_all_windows, imshow, wait_key_def};
 use opencv::imgproc::{COLOR_BGR2GRAY, cvt_color, resize_def};
 use serde::{Deserialize, Serialize};
 
 const GRAYSCALE_NORM: f64 = 1.0 / 255.0;
 const BLACK_MAX: u8 = 10;
-const FADE_MAX: f64 = 0.05;
 pub const MATCH_THRESHOLD: f64 = 0.65;
 pub const BACKGROUND_WIDTH: i32 = 320;
 pub const BACKGROUND_HEIGHT: i32 = 240;
@@ -36,13 +35,13 @@ const fn is_black(pixel: &Point3_<u8>) -> bool {
     pixel.x < BLACK_MAX && pixel.y < BLACK_MAX && pixel.z < BLACK_MAX
 }
 
-pub fn is_fade_out(mat: &Mat) -> Result<bool> {
+pub fn is_fade_out(mat: &Mat, max_brightness: f64) -> Result<bool> {
     if mat.typ() != CV_32FC1 {
         bail!("Image must be 32-bit floating point grayscale");
     }
     let num_pixels = (mat.rows() * mat.cols()) as f64;
     let average_pixel = sum_elems(&mat)?.0[0] / num_pixels;
-    Ok(average_pixel < FADE_MAX)
+    Ok(average_pixel < max_brightness)
 }
 
 fn sum_elems_square(mat: &Mat) -> Result<f64> {
@@ -85,13 +84,13 @@ fn zncc(capture: &Mat, reference: &Mat, mask: &Mat) -> Result<f64> {
     Ok(num / denom)
 }
 
-fn debug_show(mat: &Mat) -> Result<()> {
+/*fn debug_show(mat: &Mat) -> Result<()> {
     imshow("Debug", mat)?;
     wait_key_def()?;
     destroy_all_windows()?;
 
     Ok(())
-}
+}*/
 
 #[derive(Debug, Clone)]
 pub struct MaskedImage(Mat);

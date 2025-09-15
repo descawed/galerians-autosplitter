@@ -25,6 +25,8 @@ const MAIN_MENU_PATH: &str = "assets/backgrounds/main_menu.png";
 const BG_MAP_PATH: &str = "assets/backgrounds/bg_map.json";
 const FINAL_BOSS_ROOM: (Map, u16) = (Map::MushroomTower, 7);
 const MAIN_MENU_MATCH_THRESHOLD: f64 = 0.7;
+const MAIN_MENU_FADE_MAX: f64 = 0.05;
+const GAME_END_FADE_MAX: f64 = 0.01;
 
 type BackgroundMap = HashMap<(Map, u16), Vec<(Map, u16, PathBuf)>>;
 
@@ -196,7 +198,7 @@ impl ConsoleGame {
 
         let mut best_match = None;
         for (dest_map, dest_room, reference_image) in &self.current_links {
-            let score = if *dest_map == Map::MushroomTower && *dest_room == 7 {
+            let score = if (*dest_map, *dest_room) == FINAL_BOSS_ROOM {
                 // the background displayed in this room is a darkened version of the actual
                 // background image, and our matching algorithm has trouble with very dark images
                 // anyway, so we need to brighten the capture image for comparison
@@ -242,9 +244,8 @@ impl ConsoleGame {
         // if the player is in the final boss room, check for game completion by detecting the fade
         // to black
         if self.is_in_final_boss_room() && !self.has_defeated_final_boss {
-            // TODO: make sure this doesn't trigger too early; this room is pretty dark to begin with
             // FIXME: this would also trigger if the player dies
-            if is_fade_out(&trans_capture)? {
+            if is_fade_out(&trans_capture, GAME_END_FADE_MAX)? {
                 self.has_defeated_final_boss = true;
                 return Ok(());
             }
@@ -252,8 +253,8 @@ impl ConsoleGame {
 
         // if we're at the main menu, check for the start of a new game
         if self.is_at_main_menu && !self.is_new_game_start {
-            // FIXME: this would also trigger if the trailer starts playing
-            if is_fade_out(&trans_capture)? {
+            // FIXME: this also triggers if the trailer starts playing
+            if is_fade_out(&trans_capture, MAIN_MENU_FADE_MAX)? {
                 self.is_at_main_menu = false;
                 self.is_new_game_start = true;
                 log::debug!("New game start");

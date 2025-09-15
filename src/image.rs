@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 const GRAYSCALE_NORM: f64 = 1.0 / 255.0;
 const BLACK_MAX: u8 = 10;
 const FADE_MAX: f64 = 0.05;
-const MATCH_THRESHOLD: f64 = 0.7;
+const MATCH_THRESHOLD: f64 = 0.65;
 pub const BACKGROUND_WIDTH: i32 = 320;
 pub const BACKGROUND_HEIGHT: i32 = 240;
 const SEARCH_X: i32 = 12;

@@ -198,9 +198,22 @@ class BackgroundMap:
                             bg_manifest, 0,
                         )
                     elif room_name == 'C0101':
-                        # hotel lobby from upper floors
+                        # hotel lobby from upper floors, light and dark variants
                         self.add_link(
                             Map.HOTEL_2F, 6,
+                            current_map_index, current_room_index,
+                            room, map_room.module_index,
+                            bg_manifest, 3,
+                        )
+                        self.add_link(
+                            Map.HOTEL_2F, 6,
+                            current_map_index, current_room_index,
+                            room, map_room.module_index,
+                            bg_manifest, 3,
+                            1,
+                        )
+                        self.add_link(
+                            Map.HOTEL_3F, 6,
                             current_map_index, current_room_index,
                             room, map_room.module_index,
                             bg_manifest, 3,
@@ -210,6 +223,7 @@ class BackgroundMap:
                             current_map_index, current_room_index,
                             room, map_room.module_index,
                             bg_manifest, 3,
+                            1,
                         )
                     elif room_name == 'C0207':
                         # hotel second floor hallway from other floors

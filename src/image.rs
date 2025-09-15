@@ -156,10 +156,6 @@ impl ReferenceImage {
 
         Ok(num / denom)
     }
-
-    pub fn is_match_to(&self, capture: &MaskedImage) -> Result<bool> {
-        self.match_score(capture).map(|score| score > MATCH_THRESHOLD)
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

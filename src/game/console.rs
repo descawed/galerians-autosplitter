@@ -23,6 +23,7 @@ const HUD_MASK_PATH: &str = "assets/backgrounds/hud_mask.png";
 const MAIN_MENU_PATH: &str = "assets/backgrounds/main_menu.png";
 const BG_MAP_PATH: &str = "assets/backgrounds/bg_map.json";
 const FINAL_BOSS_ROOM: (Map, u16) = (Map::MushroomTower, 7);
+const MAIN_MENU_MATCH_THRESHOLD: f64 = 0.7;
 
 type BackgroundMap = HashMap<(Map, u16), Vec<(Map, u16, PathBuf)>>;
 
@@ -130,7 +131,7 @@ impl ConsoleGame {
         let mut settings = load_device_settings()?;
         let transform = if force_calibrate || !settings.contains_key(&device_index) {
             let transform = calibrate(&mut capture_device, &hud_mask)?;
-            println!("Calibration complete. Transform: {:?}", transform);
+            println!("Calibration complete. Transform: {transform:?}");
             settings.insert(device_index, transform.clone());
             save_device_settings(&settings)?;
             transform
@@ -249,9 +250,12 @@ impl ConsoleGame {
         // lastly, check if the player is at the main menu
         if !self.is_at_main_menu {
             let capture = MaskedImage::unmasked(trans_capture);
-            if self.main_menu.is_match_to(&capture)? {
+            // the room 204 door triggers a false positive for the main menu with the normal match
+            // threshold, so we use a slightly higher threshold here
+            let score = self.main_menu.match_score(&capture)?;
+            if score > MAIN_MENU_MATCH_THRESHOLD {
                 self.set_room(Map::Hospital15F, 0)?;
-                log::debug!("At main menu");
+                log::debug!("At main menu: {score}");
                 self.is_at_main_menu = true;
                 self.is_new_game_start = false;
             }

@@ -206,6 +206,48 @@ class BackgroundMap:
                             room, map_room.module_index,
                             bg_manifest, 0,
                         )
+                    elif room_name == 'C0101':
+                        # hotel lobby from upper floors
+                        self.add_link(
+                            Map.HOTEL_2F, 6,
+                            current_map_index, current_room_index,
+                            room, map_room.module_index,
+                            bg_manifest, 3,
+                        )
+                        self.add_link(
+                            Map.HOTEL_3F, 6,
+                            current_map_index, current_room_index,
+                            room, map_room.module_index,
+                            bg_manifest, 3,
+                        )
+                    elif room_name == 'C0207':
+                        # hotel second floor hallway from other floors
+                        self.add_link(
+                            Map.HOTEL_1F, 0,
+                            current_map_index, current_room_index,
+                            room, map_room.module_index,
+                            bg_manifest, 0,
+                        )
+                        self.add_link(
+                            Map.HOTEL_3F, 6,
+                            current_map_index, current_room_index,
+                            room, map_room.module_index,
+                            bg_manifest, 0,
+                        )
+                    elif room_name == 'C0307':
+                        # hotel third floor hallway from lower floors
+                        self.add_link(
+                            Map.HOTEL_1F, 0,
+                            current_map_index, current_room_index,
+                            room, map_room.module_index,
+                            bg_manifest, 0,
+                        )
+                        self.add_link(
+                            Map.HOTEL_2F, 6,
+                            current_map_index, current_room_index,
+                            room, map_room.module_index,
+                            bg_manifest, 0,
+                        )
 
                     if len(room.entrances) == 0:
                         # some rooms have entrances we can't detect automatically, so we have to define them manually

@@ -3,6 +3,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
+use opencv::core::min as cv_min;
 use opencv::prelude::*;
 use opencv::imgcodecs::{IMREAD_GRAYSCALE, imread};
 use opencv::videoio::VideoCapture;
@@ -195,7 +196,20 @@ impl ConsoleGame {
 
         let mut best_match = None;
         for (dest_map, dest_room, reference_image) in &self.current_links {
-            let score = reference_image.match_score(&capture)?;
+            let score = if *dest_map == Map::MushroomTower && *dest_room == 7 {
+                // the background displayed in this room is a darkened version of the actual
+                // background image, and our matching algorithm has trouble with very dark images
+                // anyway, so we need to brighten the capture image for comparison
+                let mut brightened = Mat::default();
+                trans_capture.convert_to(&mut brightened, -1, 5.0, 0.0)?;
+                let mut clipped = Mat::default();
+                cv_min(&brightened, &1.0, &mut clipped)?;
+                let masked = self.hud_mask.mask(&clipped)?;
+                reference_image.match_score(&masked)?
+            } else {
+                reference_image.match_score(&capture)?
+            };
+
             if score > MATCH_THRESHOLD {
                 // if one of the matches is the expected next room, always take that one
                 let route_match = match route_hint {

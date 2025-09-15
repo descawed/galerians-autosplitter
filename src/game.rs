@@ -4,6 +4,7 @@ use anyhow::Result;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::platform::PlatformRef;
+use crate::splits::Event;
 
 mod console;
 pub use console::ConsoleGame;
@@ -93,7 +94,7 @@ pub enum GameState {
 
 pub trait Game: Debug {
     /// Update our information on the game state from the connected game instance
-    fn update(&mut self) -> GameState;
+    fn update(&mut self, route_hint: Option<&Event>) -> GameState;
     
     fn reconnect(&mut self, platform: &PlatformRef) -> Result<()>;
 

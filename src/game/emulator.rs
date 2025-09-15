@@ -5,6 +5,7 @@ use anyhow::Result;
 
 use super::{Game, GameState, Item, Stage};
 use crate::platform::{Emulator, PlatformInterface, PlatformRef};
+use crate::splits::Event;
 
 const SEARCH_STRING: &[u8] = b"GALERIANS";
 const NEW_GAME_MENU_STATE: i32 = 99;
@@ -184,7 +185,7 @@ impl EmulatorGame {
 }
 
 impl Game for EmulatorGame {
-    fn update(&mut self) -> GameState {
+    fn update(&mut self, _route_hint: Option<&Event>) -> GameState {
         if !self.check_emulator() {
             return GameState::Disconnected;
         }

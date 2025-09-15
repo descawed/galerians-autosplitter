@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 const GRAYSCALE_NORM: f64 = 1.0 / 255.0;
 const BLACK_MAX: u8 = 10;
 const FADE_MAX: f64 = 0.05;
-const MATCH_THRESHOLD: f64 = 0.65;
+pub const MATCH_THRESHOLD: f64 = 0.65;
 pub const BACKGROUND_WIDTH: i32 = 320;
 pub const BACKGROUND_HEIGHT: i32 = 240;
 const SEARCH_X: i32 = 12;
@@ -144,18 +144,21 @@ impl ReferenceImage {
         })
     }
 
-    pub fn is_match_to(&self, capture: &MaskedImage) -> Result<bool> {
-        // apply mask
+    pub fn match_score(&self, capture: &MaskedImage) -> Result<f64> {
         let capture_square_sum = sum_elems_square(&capture.0)?;
 
         let denom = (capture_square_sum * self.image_square_sum).sqrt();
         if denom == 0.0 {
-            return Ok(false);
+            return Ok(0.0);
         }
 
         let num = sum_elems(&(&capture.0).elem_mul(&self.image.0).into_result()?)?.0[0];
 
-        Ok((num / denom) > MATCH_THRESHOLD)
+        Ok(num / denom)
+    }
+
+    pub fn is_match_to(&self, capture: &MaskedImage) -> Result<bool> {
+        self.match_score(capture).map(|score| score > MATCH_THRESHOLD)
     }
 }
 

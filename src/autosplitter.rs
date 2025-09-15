@@ -335,12 +335,7 @@ impl AutoSplitter {
         }
     }
 
-    fn check_split_event(&mut self) -> Result<bool> {
-        let split_index = self.live_split.get_split_index()?;
-        if split_index < 0 {
-            return Ok(false);
-        }
-
+    fn check_split_event(&mut self, split_index: i64) -> Result<bool> {
         let Some(event) = self.splits.and_then(|s| s.get(split_index as usize)) else {
             return Ok(false);
         };
@@ -365,8 +360,15 @@ impl AutoSplitter {
             }
         }
 
+        let split_index = self.live_split.get_split_index()?;
+        let route_hint = if split_index >= 0 {
+            self.splits.and_then(|s| s.get(split_index as usize))
+        } else {
+            None
+        };
+
         // make sure the user hasn't changed the game out from under us
-        match self.game.update() {
+        match self.game.update(route_hint) {
             GameState::Connected => {}
             GameState::GameChanged => {
                 // if we just changed to a different game, any run we had in progress is no longer
@@ -426,7 +428,7 @@ impl AutoSplitter {
                 log::info!("Run completed!");
             }
         } else if self.splits.is_some() {
-            if self.check_split_event()? {
+            if self.check_split_event(split_index)? {
                 self.split()?;
             }
         } else if self.last_room != current_room {

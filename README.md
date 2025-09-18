@@ -37,9 +37,9 @@ straightforward.
 
 The autosplitter can also be used when playing the game on console. This works by watching the video capture and using
 the pre-rendered backgrounds to determine which room you're in. This feature should currently be considered somewhat
-experimental. I've tested it successfully over the course of a full (but segmented) run on my own capture setup, but I
-can't guarantee it will work with all capture setups. I've also only tested it on Linux, although it should in theory
-work on Windows.
+experimental. I've tested it successfully over the course of multiple full runs on my own capture setup, but I can't
+guarantee it will work with all capture setups. I've also only tested it on Linux, although it should in theory work on
+Windows.
 
 The first time you use this feature with a new capture device, you'll have to go through a calibration process. This
 involves starting a new game, getting to the first screen where you have control of Rion, and then letting the

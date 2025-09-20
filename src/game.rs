@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use anyhow::Result;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
+use crate::RunCategory;
 use crate::platform::PlatformRef;
 use crate::splits::Event;
 
@@ -97,6 +98,8 @@ pub trait Game: Debug {
     fn update(&mut self, route_hint: Option<&Event>) -> GameState;
     
     fn reconnect(&mut self, platform: &PlatformRef) -> Result<()>;
+    
+    fn set_run_category(&mut self, new_category: RunCategory) -> Result<()>;
 
     fn is_at_main_menu(&self) -> bool;
 

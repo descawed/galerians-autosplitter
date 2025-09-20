@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 
-use crate::SplitType;
+use crate::{RunCategory, SplitType};
 use crate::game::{ConsoleGame, EmulatorGame, Game, GameState};
 use crate::lss::{LiveSplit, TimerPhase};
 use crate::platform::{Platform, PlatformRef};
@@ -21,6 +21,7 @@ const FINAL_BOSS_ROOM: (u16, u16) = (8, 7);
 const LIVE_SPLIT_KEEP_ALIVE: i32 = 334; // ~5 seconds at the default update frequency
 
 const SPLIT_TYPE_VARIABLE_NAME: &str = "GaleriansSplitType";
+const RUN_CATEGORY_VARIABLE_NAME: &str = "GaleriansCategory";
 
 #[derive(Debug, Clone)]
 struct KeepAliveCounter {
@@ -111,6 +112,19 @@ fn get_live_split_split_type(live_split: &mut LiveSplit) -> Result<Option<SplitT
     Ok(Some(split_type))
 }
 
+fn get_live_split_run_category(live_split: &mut LiveSplit) -> Result<Option<RunCategory>> {
+    let Some(str_run_category) = live_split.get_custom_variable_value(RUN_CATEGORY_VARIABLE_NAME)? else {
+        return Ok(None);
+    };
+
+    let Ok(run_category) = RunCategory::try_from(str_run_category.as_str()) else {
+        log::warn!("LiveSplit reported unrecognized run category {str_run_category}; ignoring");
+        return Ok(None);
+    };
+
+    Ok(Some(run_category))
+}
+
 #[derive(Debug)]
 pub struct AutoSplitter {
     connection_state: ConnectionState,
@@ -124,6 +138,9 @@ pub struct AutoSplitter {
     requested_split_type: Option<SplitType>,
     effective_split_type: Option<SplitType>,
     last_reported_split_type: Option<SplitType>,
+    requested_run_category: Option<RunCategory>,
+    effective_run_category: Option<RunCategory>,
+    last_reported_run_category: Option<RunCategory>,
     splits: Option<&'static [Event]>,
 }
 
@@ -134,6 +151,7 @@ impl AutoSplitter {
         capture_device: i32,
         force_calibrate: bool,
         requested_split_type: Option<SplitType>,
+        requested_run_category: Option<RunCategory>,
     ) -> Result<Self> {
         let mut live_split = wait_for_live_split(live_split_port);
         let is_console = match requested_split_type {
@@ -169,6 +187,9 @@ impl AutoSplitter {
             requested_split_type,
             effective_split_type: None,
             last_reported_split_type: None,
+            requested_run_category,
+            effective_run_category: None,
+            last_reported_run_category: None,
             splits: None,
         })
     }
@@ -226,6 +247,12 @@ impl AutoSplitter {
     fn set_split_type(&mut self, split_type: SplitType) {
         self.effective_split_type = Some(split_type);
         self.splits = split_type.splits();
+    }
+
+    fn set_run_category(&mut self, run_category: RunCategory) -> Result<()> {
+        self.effective_run_category = Some(run_category);
+        self.game.set_run_category(run_category)?;
+        Ok(())
     }
     
     fn get_live_split_split_type(&mut self) -> Result<Option<SplitType>> {
@@ -288,6 +315,61 @@ impl AutoSplitter {
         Ok(())
     }
 
+    fn sync_run_category(&mut self) -> Result<()> {
+        let live_split_run_category = get_live_split_run_category(&mut self.live_split)?;
+
+        match (self.requested_run_category, self.effective_run_category, live_split_run_category) {
+            (None, None, None) => {
+                log::warn!("No run category was specified by either the user or the splits; default to Any%");
+            }
+            (None, None, Some(run_category)) => {
+                log::info!("Run category {} detected from LiveSplit splits", run_category.as_str());
+                self.set_run_category(run_category)?;
+            }
+            (None, Some(old_run_category), Some(new_run_category)) => {
+                if old_run_category != new_run_category {
+                    log::info!("LiveSplit splits were changed; new run category is {}. Resetting", new_run_category.as_str());
+                    self.set_run_category(new_run_category)?;
+                    self.reset()?;
+                }
+            }
+            (_, Some(old_run_category), None) => {
+                if self.last_reported_run_category.is_some() {
+                    log::warn!(
+                        "LiveSplit splits were changed but the new run category could not be detected. Continuing to use old run category {}",
+                        old_run_category.as_str(),
+                    );
+                }
+            }
+            (Some(requested_run_category), None, None) => self.set_run_category(requested_run_category)?,
+            (Some(requested_run_category), None, Some(reported_run_category)) => {
+                if requested_run_category != reported_run_category {
+                    log::warn!(
+                        "User requested run category {} but LiveSplit reported run category {}. Going with user choice {}",
+                        requested_run_category.as_str(),
+                        reported_run_category.as_str(),
+                        requested_run_category.as_str(),
+                    );
+                }
+                self.set_run_category(requested_run_category)?;
+            }
+            (Some(requested_run_category), Some(_), Some(reported_run_category)) => {
+                if self.last_reported_run_category != Some(reported_run_category) && requested_run_category != reported_run_category {
+                    log::warn!(
+                        "LiveSplit splits were changed and the new LiveSplit-reported run category {} does not match the user-requested run category {}. Continuing to use user-requested run category {}",
+                        reported_run_category.as_str(),
+                        requested_run_category.as_str(),
+                        requested_run_category.as_str(),
+                    );
+                }
+            }
+        }
+
+        self.last_reported_run_category = live_split_run_category;
+
+        Ok(())
+    }
+
     fn sync_with_live_split(&mut self) -> Result<()> {
         self.run_state = match self.live_split.get_timer_phase()? {
             TimerPhase::NotRunning => RunState::NotStarted,
@@ -300,6 +382,7 @@ impl AutoSplitter {
         };
 
         self.sync_split_type()?;
+        self.sync_run_category()?;
 
         Ok(())
     }

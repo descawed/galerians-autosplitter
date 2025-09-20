@@ -68,6 +68,35 @@ impl TryFrom<&str> for SplitType {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum RunCategory {
+    /// Any % (new game)
+    AnyPercent,
+    /// Replay mode (new game+)
+    ReplayMode,
+}
+
+impl RunCategory {
+    const fn as_str(&self) -> &'static str {
+        match self {
+            Self::AnyPercent => "Any%",
+            Self::ReplayMode => "Replay Mode",
+        }
+    }
+}
+
+impl TryFrom<&str> for RunCategory {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+        match value {
+            "AnyPercent" | "Any%" | "any-percent" => Ok(Self::AnyPercent),
+            "ReplayMode" | "Replay Mode" | "replay-mode" => Ok(Self::ReplayMode),
+            _ => Err(anyhow!("Unknown run category: {value}")),
+        }
+    }
+}
+
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Cli {
@@ -89,6 +118,11 @@ struct Cli {
     /// defaults to all-doors.
     #[arg(short = 'p', long, value_enum)]
     split_type: Option<SplitType>,
+    /// Speedrun category. If not provided, it will be determined from LiveSplit's split settings if
+    /// possible. If the LiveSplit split settings also don't have a valid split type, defaults to
+    /// Any%.
+    #[arg(short, long, value_enum)]
+    run_category: Option<RunCategory>,
 }
 
 fn main() -> Result<()> {
@@ -104,6 +138,7 @@ fn main() -> Result<()> {
         args.capture_device,
         args.force_calibrate,
         args.split_type,
+        args.run_category,
     )?;
     splitter.update()
 }

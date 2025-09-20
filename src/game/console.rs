@@ -9,6 +9,7 @@ use opencv::imgcodecs::{IMREAD_GRAYSCALE, imread};
 use opencv::videoio::VideoCapture;
 
 use super::{Game, GameState, Item, Map, Stage};
+use crate::RunCategory;
 use crate::image::{
     MATCH_THRESHOLD,
     CaptureImage, CaptureTransform, CaptureTransformJson, MaskImage, MaskedImage, ReferenceImage,
@@ -22,9 +23,11 @@ const BACKGROUND_PATH: &str = "assets/backgrounds/";
 const CALIBRATION_IMAGE_PATH: &str = "assets/backgrounds/A1501_4_0.png";
 const HUD_MASK_PATH: &str = "assets/backgrounds/hud_mask.png";
 const MAIN_MENU_PATH: &str = "assets/backgrounds/main_menu.png";
+const LOADING_SAVE_PATH: &str = "assets/backgrounds/loading_save.png";
 const BG_MAP_PATH: &str = "assets/backgrounds/bg_map.json";
 const FINAL_BOSS_ROOM: (Map, u16) = (Map::MushroomTower, 7);
 const MAIN_MENU_MATCH_THRESHOLD: f64 = 0.7;
+const LOADING_SAVE_MATCH_THRESHOLD: f64 = 0.85;
 const MAIN_MENU_FADE_MAX: f64 = 0.05;
 const GAME_END_FADE_MAX: f64 = 0.01;
 
@@ -100,6 +103,7 @@ pub struct ConsoleGame {
     has_defeated_final_boss: bool,
     is_at_main_menu: bool,
     is_new_game_start: bool,
+    run_category: RunCategory,
 }
 
 impl ConsoleGame {
@@ -122,6 +126,7 @@ impl ConsoleGame {
             has_defeated_final_boss: false,
             is_at_main_menu: false,
             is_new_game_start: false,
+            run_category: RunCategory::AnyPercent,
         }
     }
 
@@ -153,6 +158,13 @@ impl ConsoleGame {
 
     fn is_in_final_boss_room(&self) -> bool {
         (self.current_map, self.current_room) == FINAL_BOSS_ROOM
+    }
+    
+    fn load_menu_image(&self, path: impl AsRef<str>) -> Result<ReferenceImage> {
+        let main_menu = load_gray(path)?;
+        let main_menu = self.transform.transform_bg(&main_menu)?;
+        let main_menu = MaskedImage::unmasked(main_menu);
+        ReferenceImage::new(main_menu)
     }
 
     fn set_room(&mut self, map: Map, room: u16) -> Result<()> {
@@ -268,7 +280,12 @@ impl ConsoleGame {
             // the room 204 door triggers a false positive for the main menu with the normal match
             // threshold, so we use a slightly higher threshold here
             let score = self.main_menu.match_score(&capture)?;
-            if score > MAIN_MENU_MATCH_THRESHOLD {
+            let threshold = if self.run_category == RunCategory::ReplayMode {
+                LOADING_SAVE_MATCH_THRESHOLD
+            } else {
+                MAIN_MENU_MATCH_THRESHOLD
+            };
+            if score > threshold {
                 self.set_room(Map::Hospital15F, 0)?;
                 log::debug!("At main menu: {score}");
                 self.is_at_main_menu = true;
@@ -293,6 +310,26 @@ impl Game for ConsoleGame {
 
     fn reconnect(&mut self, _platform: &PlatformRef) -> Result<()> {
         bail!("Video capture reconnect is not implemented");
+    }
+
+    fn set_run_category(&mut self, new_category: RunCategory) -> Result<()> {
+        match (new_category, self.run_category) {
+            (RunCategory::AnyPercent, RunCategory::ReplayMode) => {
+                self.run_category = new_category;
+                self.main_menu = self.load_menu_image(MAIN_MENU_PATH)?;
+                self.is_at_main_menu = false;
+                self.is_new_game_start = false;
+            }
+            (RunCategory::ReplayMode, RunCategory::AnyPercent) => {
+                self.run_category = new_category;
+                self.main_menu = self.load_menu_image(LOADING_SAVE_PATH)?;
+                self.is_at_main_menu = false;
+                self.is_new_game_start = false;
+            }
+            _ => (),
+        }
+        
+        Ok(())
     }
 
     fn is_at_main_menu(&self) -> bool {

@@ -4,6 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 
 use super::{Game, GameState, Item, Stage};
+use crate::RunCategory;
 use crate::platform::{Emulator, PlatformInterface, PlatformRef};
 use crate::splits::Event;
 
@@ -206,6 +207,11 @@ impl Game for EmulatorGame {
             self.version = wait_for_version(&mut self.emulator, platform);
         }
         
+        Ok(())
+    }
+
+    fn set_run_category(&mut self, _new_category: RunCategory) -> Result<()> {
+        // nothing to do
         Ok(())
     }
 

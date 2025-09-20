@@ -2,7 +2,7 @@
 <Run version="1.7.0">
   <GameIcon />
   <GameName>Galerians</GameName>
-  <CategoryName>Any%</CategoryName>
+  <CategoryName>Replay Mode</CategoryName>
   <LayoutPath>
   </LayoutPath>
   <Metadata>
@@ -15,7 +15,7 @@
     </Variables>
     <CustomVariables>
       <Variable name="GaleriansSplitType">KeyEvents</Variable>
-      <Variable name="GaleriansCategory">Any%</Variable>
+      <Variable name="GaleriansCategory">Replay Mode</Variable>
     </CustomVariables>
   </Metadata>
   <Offset>00:00:00</Offset>

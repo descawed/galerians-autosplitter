@@ -210,9 +210,8 @@ impl Game for EmulatorGame {
         Ok(())
     }
 
-    fn set_run_category(&mut self, _new_category: RunCategory) -> Result<()> {
-        // nothing to do
-        Ok(())
+    fn set_run_category(&mut self, _new_category: RunCategory) {
+        // TODO: figure out how to distinguish between starting a new game and loading a save
     }
 
     fn is_at_main_menu(&self) -> bool {

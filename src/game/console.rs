@@ -96,12 +96,14 @@ pub struct ConsoleGame {
     transform: CaptureTransform,
     hud_mask: MaskImage,
     main_menu: ReferenceImage,
+    loading_save: ReferenceImage,
     bg_map: BackgroundMap,
     current_map: Map,
     current_room: u16,
     current_links: Vec<(Map, u16, ReferenceImage)>,
     has_defeated_final_boss: bool,
     is_at_main_menu: bool,
+    is_loading_save: bool,
     is_new_game_start: bool,
     run_category: RunCategory,
 }
@@ -112,6 +114,7 @@ impl ConsoleGame {
         transform: CaptureTransform,
         hud_mask: MaskImage,
         main_menu: ReferenceImage,
+        loading_save: ReferenceImage,
         bg_map: BackgroundMap,
     ) -> Self {
         Self {
@@ -119,12 +122,14 @@ impl ConsoleGame {
             transform,
             hud_mask,
             main_menu,
+            loading_save,
             bg_map,
             current_map: Map::Hospital15F,
             current_room: 0,
             current_links: Vec::new(),
             has_defeated_final_boss: false,
             is_at_main_menu: false,
+            is_loading_save: false,
             is_new_game_start: false,
             run_category: RunCategory::AnyPercent,
         }
@@ -134,6 +139,7 @@ impl ConsoleGame {
         let mut capture_device = VideoCapture::new_def(device_index)?;
         let hud_mask = load_gray(HUD_MASK_PATH)?;
         let main_menu = load_gray(MAIN_MENU_PATH)?;
+        let loading_save = load_gray(LOADING_SAVE_PATH)?;
         let bg_map = load_bg_map()?;
 
         let mut settings = load_device_settings()?;
@@ -153,18 +159,15 @@ impl ConsoleGame {
         let main_menu = MaskedImage::unmasked(main_menu);
         let main_menu = ReferenceImage::new(main_menu)?;
 
-        Ok(Self::new(capture_device, transform, hud_mask, main_menu, bg_map))
+        let loading_save = transform.transform_bg(&loading_save)?;
+        let loading_save = MaskedImage::unmasked(loading_save);
+        let loading_save = ReferenceImage::new(loading_save)?;
+
+        Ok(Self::new(capture_device, transform, hud_mask, main_menu, loading_save, bg_map))
     }
 
     fn is_in_final_boss_room(&self) -> bool {
         (self.current_map, self.current_room) == FINAL_BOSS_ROOM
-    }
-    
-    fn load_menu_image(&self, path: impl AsRef<str>) -> Result<ReferenceImage> {
-        let main_menu = load_gray(path)?;
-        let main_menu = self.transform.transform_bg(&main_menu)?;
-        let main_menu = MaskedImage::unmasked(main_menu);
-        ReferenceImage::new(main_menu)
     }
 
     fn set_room(&mut self, map: Map, room: u16) -> Result<()> {
@@ -178,6 +181,7 @@ impl ConsoleGame {
         self.current_room = room;
         self.has_defeated_final_boss = false;
         self.is_at_main_menu = false;
+        self.is_loading_save = false;
         self.is_new_game_start = false;
 
         self.current_links.clear();
@@ -264,28 +268,35 @@ impl ConsoleGame {
         }
 
         // if we're at the main menu, check for the start of a new game
-        if self.is_at_main_menu && !self.is_new_game_start {
+        if self.is_at_main_menu && !self.is_new_game_start && self.is_loading_save == (self.run_category == RunCategory::ReplayMode) {
             // FIXME: this also triggers if the trailer starts playing
             if is_fade_out(&trans_capture, MAIN_MENU_FADE_MAX)? {
                 self.is_at_main_menu = false;
+                self.is_loading_save = false;
                 self.is_new_game_start = true;
                 log::debug!("New game start");
                 return Ok(());
             }
         }
 
+        let unmasked_capture = MaskedImage::unmasked(trans_capture);
+
+        // if we're at the main menu, check if the player is loading a save so we can distinguish
+        // between NG and NG+
+        if self.is_at_main_menu && !self.is_loading_save {
+            let score = self.loading_save.match_score(&unmasked_capture)?;
+            if score > LOADING_SAVE_MATCH_THRESHOLD {
+                self.is_loading_save = true;
+                log::debug!("Loading save: {score}");
+            }
+        }
+
         // lastly, check if the player is at the main menu
         if !self.is_at_main_menu {
-            let capture = MaskedImage::unmasked(trans_capture);
             // the room 204 door triggers a false positive for the main menu with the normal match
             // threshold, so we use a slightly higher threshold here
-            let score = self.main_menu.match_score(&capture)?;
-            let threshold = if self.run_category == RunCategory::ReplayMode {
-                LOADING_SAVE_MATCH_THRESHOLD
-            } else {
-                MAIN_MENU_MATCH_THRESHOLD
-            };
-            if score > threshold {
+            let score = self.main_menu.match_score(&unmasked_capture)?;
+            if score > MAIN_MENU_MATCH_THRESHOLD {
                 self.set_room(Map::Hospital15F, 0)?;
                 log::debug!("At main menu: {score}");
                 self.is_at_main_menu = true;
@@ -312,24 +323,13 @@ impl Game for ConsoleGame {
         bail!("Video capture reconnect is not implemented");
     }
 
-    fn set_run_category(&mut self, new_category: RunCategory) -> Result<()> {
-        match (new_category, self.run_category) {
-            (RunCategory::AnyPercent, RunCategory::ReplayMode) => {
-                self.run_category = new_category;
-                self.main_menu = self.load_menu_image(MAIN_MENU_PATH)?;
-                self.is_at_main_menu = false;
-                self.is_new_game_start = false;
-            }
-            (RunCategory::ReplayMode, RunCategory::AnyPercent) => {
-                self.run_category = new_category;
-                self.main_menu = self.load_menu_image(LOADING_SAVE_PATH)?;
-                self.is_at_main_menu = false;
-                self.is_new_game_start = false;
-            }
-            _ => (),
+    fn set_run_category(&mut self, new_category: RunCategory) {
+        if self.run_category != new_category {
+            self.run_category = new_category;
+            self.is_at_main_menu = false;
+            self.is_loading_save = false;
+            self.is_new_game_start = false;
         }
-        
-        Ok(())
     }
 
     fn is_at_main_menu(&self) -> bool {

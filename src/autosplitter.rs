@@ -249,10 +249,9 @@ impl AutoSplitter {
         self.splits = split_type.splits();
     }
 
-    fn set_run_category(&mut self, run_category: RunCategory) -> Result<()> {
+    fn set_run_category(&mut self, run_category: RunCategory) {
         self.effective_run_category = Some(run_category);
-        self.game.set_run_category(run_category)?;
-        Ok(())
+        self.game.set_run_category(run_category);
     }
     
     fn get_live_split_split_type(&mut self) -> Result<Option<SplitType>> {
@@ -324,12 +323,12 @@ impl AutoSplitter {
             }
             (None, None, Some(run_category)) => {
                 log::info!("Run category {} detected from LiveSplit splits", run_category.as_str());
-                self.set_run_category(run_category)?;
+                self.set_run_category(run_category);
             }
             (None, Some(old_run_category), Some(new_run_category)) => {
                 if old_run_category != new_run_category {
                     log::info!("LiveSplit splits were changed; new run category is {}. Resetting", new_run_category.as_str());
-                    self.set_run_category(new_run_category)?;
+                    self.set_run_category(new_run_category);
                     self.reset()?;
                 }
             }
@@ -341,7 +340,7 @@ impl AutoSplitter {
                     );
                 }
             }
-            (Some(requested_run_category), None, None) => self.set_run_category(requested_run_category)?,
+            (Some(requested_run_category), None, None) => self.set_run_category(requested_run_category),
             (Some(requested_run_category), None, Some(reported_run_category)) => {
                 if requested_run_category != reported_run_category {
                     log::warn!(
@@ -351,7 +350,7 @@ impl AutoSplitter {
                         requested_run_category.as_str(),
                     );
                 }
-                self.set_run_category(requested_run_category)?;
+                self.set_run_category(requested_run_category);
             }
             (Some(requested_run_category), Some(_), Some(reported_run_category)) => {
                 if self.last_reported_run_category != Some(reported_run_category) && requested_run_category != reported_run_category {

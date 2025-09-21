@@ -99,7 +99,7 @@ pub trait Game: Debug {
     
     fn reconnect(&mut self, platform: &PlatformRef) -> Result<()>;
     
-    fn set_run_category(&mut self, new_category: RunCategory) -> Result<()>;
+    fn set_run_category(&mut self, new_category: RunCategory);
 
     fn is_at_main_menu(&self) -> bool;
 

@@ -92,7 +92,7 @@ create_device 'Galerians autosplitter share' "$autosplitter_index"
 autosplitter_device="$share_device"
 
 echo Sharing input capture...
-ffmpeg -nostdin -y\
+ffmpeg -y -fflags nobuffer -flags low_delay\
  -f v4l2 -input_format "$ffmpeg_pixel_format" -video_size "$resolution" -i "/dev/video$input_index"\
  -f v4l2 -pix_fmt "$ffmpeg_pixel_format" "$obs_device"\
  -f v4l2 -pix_fmt "$ffmpeg_pixel_format" "$autosplitter_device"

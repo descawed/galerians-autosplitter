@@ -38,8 +38,7 @@ straightforward.
 The autosplitter can also be used when playing the game on console. This works by watching the video capture and using
 the pre-rendered backgrounds to determine which room you're in. This feature should currently be considered somewhat
 experimental. I've tested it successfully over the course of multiple full runs on my own capture setup, but I can't
-guarantee it will work with all capture setups. I've also only tested it on Linux, although it should in theory work on
-Windows.
+guarantee it will work with all capture setups.
 
 The first time you use this feature with a new capture device, you'll have to go through a calibration process. This
 involves starting a new game, getting to the first screen where you have control of Rion, and then letting the
@@ -65,8 +64,10 @@ to leave this script running as long as you're using these virtual devices. Also
 introduce some latency in the capture, although it's generally very small. The script supports some additional
 parameters if you need to configure any video settings; run it with no arguments to see the list of options.
 
-I have no idea what would be involved in setting up a similar pipeline on Windows. An alternative low-tech solution
-would be to set up a camera to record your screen IRL and then allow the autosplitter exclusive use of the capture card.
+On Windows, the easiest way to do this is with OBS' Virtual Camera feature. Add the video capture device as a source,
+go to the virtual camera settings, tell it to use that source, then start the virtual camera. The autosplitter can then
+watch the virtual camera. I expect this workflow to work on Linux as well, but I haven't tested it. Unfortunately, on
+Windows, I don't know how to identify the device index of the virtual camera other than trial and error.
 
 ## Advanced Usage
 
@@ -100,6 +101,14 @@ this can be done with the `-p`/`--split-type` option. If the splits you're using
 indicating which split type to use, and you don't specify a split type with this option, the autosplitter will print a
 warning and default to `all-doors`.
 
+You can use the `-r`/`--run-category` option to specify whether you're running `any-percent` or `replay-mode`. Like the
+split type, this will be detected automatically if using the included splits, so it's not normally necessary to specify
+it explicitly.
+
+The `-g`/`--log-level` option can be used to control the amount of logging output the autosplitter produces. The default
+is `info`, which will print out informational messages about what the autosplitter is doing. If the autosplitter is
+misbehaving, `debug` can be useful to get more information about what's going on.
+
 ### Console Options
 
 The following options only apply to console runs:
@@ -125,3 +134,8 @@ autosplitter is trying to apply saved settings to the wrong device.
   For example, if you die during the Dorothy fight, the autosplitter will think you've completed the run. Likewise,
   selecting any option on the main menu, or waiting long enough for the trailer to start playing, will all be
   interpreted as the start of a run. The run will be automatically reset upon returning to the main menu.
+- In the past, I've seen the console autosplitter stop the timer early because the Dorothy room is so dark that it
+  triggers a false positive on the fade-to-black detection. I've adjusted the brightness threshold to try to prevent
+  this from happening, but I can't say for sure that it's not still possible depending on your capture setup. If this
+  happens, I recommend stopping the autosplitter, undoing the split in LiveSplit, and then splitting manually when you
+  defeat the boss.

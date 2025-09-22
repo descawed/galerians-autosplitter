@@ -4,6 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 
 use super::{Game, GameState, Item, Stage};
+use crate::RunCategory;
 use crate::platform::{Emulator, PlatformInterface, PlatformRef};
 use crate::splits::Event;
 
@@ -207,6 +208,10 @@ impl Game for EmulatorGame {
         }
         
         Ok(())
+    }
+
+    fn set_run_category(&mut self, _new_category: RunCategory) {
+        // TODO: figure out how to distinguish between starting a new game and loading a save
     }
 
     fn is_at_main_menu(&self) -> bool {

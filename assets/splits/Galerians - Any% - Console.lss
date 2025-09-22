@@ -15,6 +15,7 @@
     </Variables>
     <CustomVariables>
       <Variable name="GaleriansSplitType">RouteDoorsConsole</Variable>
+      <Variable name="GaleriansCategory">Any%</Variable>
     </CustomVariables>
   </Metadata>
   <Offset>00:00:00</Offset>

@@ -2,7 +2,7 @@ use anyhow::{Result, bail};
 use opencv::prelude::*;
 use opencv::core::{CV_32F, CV_8UC1, CV_8UC3, CV_32FC1, Point3_, Rect, Size, ElemMul, sum_elems};
 //use opencv::highgui::{destroy_all_windows, imshow, wait_key_def};
-use opencv::imgproc::{COLOR_BGR2GRAY, cvt_color, resize_def};
+use opencv::imgproc::{COLOR_BGR2GRAY, cvt_color_def, resize_def};
 use serde::{Deserialize, Serialize};
 
 const GRAYSCALE_NORM: f64 = 1.0 / 255.0;
@@ -206,7 +206,7 @@ impl CaptureTransform {
 
     pub fn transform_capture(&self, mat: &Mat) -> Result<Mat> {
         let mut grayscale = Mat::default();
-        cvt_color(mat, &mut grayscale, COLOR_BGR2GRAY, 0)?;
+        cvt_color_def(mat, &mut grayscale, COLOR_BGR2GRAY)?;
         let grayscale = gray_float(grayscale)?;
         let cropped = crop(&grayscale, self.capture_roi.x, self.capture_roi.y, self.capture_roi.width, self.capture_roi.height)?;
         scale_to(&cropped, self.bg_roi.width, self.bg_roi.height)
@@ -247,7 +247,7 @@ impl CaptureImage {
         let capture_roi = Rect::new(x_min, y_min, x_max - x_min, y_max - y_min);
         let cropped = self.0.roi(capture_roi)?;
         let mut grayscale = Mat::default();
-        cvt_color(&cropped, &mut grayscale, COLOR_BGR2GRAY, 0)?;
+        cvt_color_def(&cropped, &mut grayscale, COLOR_BGR2GRAY)?;
         let grayscale = gray_float(grayscale)?;
 
         // the background may be slightly cut off in the capture, so we'll try different

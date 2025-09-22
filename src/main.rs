@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use clap::{Parser, ValueEnum};
+use log::LevelFilter;
 
 mod autosplitter;
 use autosplitter::AutoSplitter;
@@ -11,6 +12,42 @@ mod lss;
 mod platform;
 mod splits;
 use splits::{Event, CONSOLE_DOOR_SPLITS, DOOR_SPLITS, KEY_EVENT_SPLITS};
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum LevelFilterArg {
+    Off,
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl From<LevelFilter> for LevelFilterArg {
+    fn from(level: LevelFilter) -> Self {
+        match level {
+            LevelFilter::Off => Self::Off,
+            LevelFilter::Trace => Self::Trace,
+            LevelFilter::Debug => Self::Debug,
+            LevelFilter::Info => Self::Info,
+            LevelFilter::Warn => Self::Warn,
+            LevelFilter::Error => Self::Error,
+        }
+    }
+}
+
+impl From<LevelFilterArg> for LevelFilter {
+    fn from(value: LevelFilterArg) -> Self {
+        match value {
+            LevelFilterArg::Off => Self::Off,
+            LevelFilterArg::Trace => Self::Trace,
+            LevelFilterArg::Debug => Self::Debug,
+            LevelFilterArg::Info => Self::Info,
+            LevelFilterArg::Warn => Self::Warn,
+            LevelFilterArg::Error => Self::Error,
+        }
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum SplitType {
@@ -68,6 +105,35 @@ impl TryFrom<&str> for SplitType {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum RunCategory {
+    /// Any % (new game)
+    AnyPercent,
+    /// Replay mode (new game+)
+    ReplayMode,
+}
+
+impl RunCategory {
+    const fn as_str(&self) -> &'static str {
+        match self {
+            Self::AnyPercent => "Any%",
+            Self::ReplayMode => "Replay Mode",
+        }
+    }
+}
+
+impl TryFrom<&str> for RunCategory {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+        match value {
+            "AnyPercent" | "Any%" | "any-percent" => Ok(Self::AnyPercent),
+            "ReplayMode" | "Replay Mode" | "replay-mode" => Ok(Self::ReplayMode),
+            _ => Err(anyhow!("Unknown run category: {value}")),
+        }
+    }
+}
+
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Cli {
@@ -89,12 +155,20 @@ struct Cli {
     /// defaults to all-doors.
     #[arg(short = 'p', long, value_enum)]
     split_type: Option<SplitType>,
+    /// Speedrun category. If not provided, it will be determined from LiveSplit's split settings if
+    /// possible. If the LiveSplit split settings also don't have a valid split type, defaults to
+    /// Any%.
+    #[arg(short, long, value_enum)]
+    run_category: Option<RunCategory>,
+    /// What level of logging output to show
+    #[arg(short = 'g', long, value_enum, default_value_t = LevelFilterArg::Info)]
+    log_level: LevelFilterArg,
 }
 
 fn main() -> Result<()> {
-    colog::init();
-
     let args = Cli::parse();
+
+    colog::default_builder().filter_level(args.log_level.into()).init();
 
     // create autosplitter
     let update_duration = Duration::from_millis(args.update_frequency);
@@ -104,6 +178,7 @@ fn main() -> Result<()> {
         args.capture_device,
         args.force_calibrate,
         args.split_type,
+        args.run_category,
     )?;
     splitter.update()
 }

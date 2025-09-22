@@ -29,7 +29,7 @@ const FINAL_BOSS_ROOM: (Map, u16) = (Map::MushroomTower, 7);
 const MAIN_MENU_MATCH_THRESHOLD: f64 = 0.7;
 const LOADING_SAVE_MATCH_THRESHOLD: f64 = 0.85;
 const MAIN_MENU_FADE_MAX: f64 = 0.05;
-const GAME_END_FADE_MAX: f64 = 0.01;
+const GAME_END_FADE_MAX: f64 = 0.005;
 
 type BackgroundMap = HashMap<(Map, u16), Vec<(Map, u16, PathBuf)>>;
 

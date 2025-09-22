@@ -166,6 +166,9 @@ class BackgroundMap:
                     room = self.room_modules[map_room.module_index]
 
                     room_name = get_room_name(room, map_room.module_index)
+                    if room_name == 'A14RH':
+                        # this room is unused; skip it to avoid false positives
+                        continue
 
                     # add links manually for rooms where they can't be discovered automatically
                     if room_name == 'B0201':

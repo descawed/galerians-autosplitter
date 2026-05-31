@@ -82,7 +82,7 @@ LiveSplit's default port, 16834, but you can use the `-l`/`--live-split-port` op
 need to. By default, the autosplitter will check the game state and update LiveSplit every 15 ms, but you can control
 this duration with the `-u`/`--update-frequency` option.
 
-The autosplitter supports three splitting strategies:
+The autosplitter supports four splitting strategies:
 
 - `all-doors` - splits on every door
 - `route-doors` - splits on doors, but only if the door is the next door expected in the proper route. This helps avoid

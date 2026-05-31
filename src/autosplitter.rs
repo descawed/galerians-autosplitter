@@ -390,7 +390,7 @@ impl AutoSplitter {
         loop {
             match self.connection_state {
                 ConnectionState::LiveSplitPending => self.wait_for_live_split(),
-                ConnectionState::GamePending => self.game.reconnect(&self.platform)?,
+                ConnectionState::GamePending => self.reconnect_game()?,
                 ConnectionState::Connected => self.update_splits()?,
             }
 
@@ -417,6 +417,12 @@ impl AutoSplitter {
         }
     }
 
+    fn reconnect_game(&mut self) -> Result<()> {
+        self.game.reconnect(&self.platform)?;
+        self.connection_state.advance();
+        Ok(())
+    }
+
     fn check_split_event(&mut self, split_index: i64) -> Result<bool> {
         let Some(event) = self.splits.and_then(|s| s.get(split_index as usize)) else {
             return Ok(false);
@@ -434,6 +440,15 @@ impl AutoSplitter {
     }
 
     fn update_splits(&mut self) -> Result<()> {
+        let result = self.update_splits_inner();
+        if result.is_err() && !self.live_split.is_connected() {
+            self.conn_fail(ConnectionState::LiveSplitPending)
+        } else {
+            result
+        }
+    }
+
+    fn update_splits_inner(&mut self) -> Result<()> {
         if self.live_split_keep_alive.should_check() {
             // make sure the LiveSplit connection is still good and our run state is in sync with theirs
             if self.sync_with_live_split().is_err() && !self.live_split.is_connected() {

@@ -8,6 +8,7 @@ use anyhow::{anyhow, bail, Result};
 
 const MAX_RETRIES: u8 = 3;
 const RETRY_DELAY: Duration = Duration::from_millis(500);
+const SOCKET_TIMEOUT: Duration = Duration::from_secs(1);
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum TimerPhase {
@@ -39,7 +40,10 @@ pub struct LiveSplit {
 impl LiveSplit {
     pub fn create(port: u16) -> Result<Self> {
         let addr = ("127.0.0.1", port).to_socket_addrs()?.next().unwrap();
-        let connection = BufReader::new(TcpStream::connect(addr)?);
+        let connection = TcpStream::connect(addr)?;
+        connection.set_read_timeout(Some(SOCKET_TIMEOUT))?;
+        connection.set_write_timeout(Some(SOCKET_TIMEOUT))?;
+        let connection = BufReader::new(connection);
         log::info!("Successfully connected to LiveSplit");
 
         Ok(Self {
@@ -103,6 +107,10 @@ impl LiveSplit {
         for _ in 0..MAX_RETRIES {
             let mut buf = Vec::new();
             match self.connection.read_until(b'\n', &mut buf) {
+                Ok(0) => {
+                    self.connection_lost(&"Connection closed");
+                    bail!("Connection closed");
+                }
                 Ok(_) => {
                     // strip the trailing newline
                     buf.pop();
@@ -154,9 +162,11 @@ impl LiveSplit {
     }
 
     pub fn get_custom_variable_value(&mut self, variable_name: &str) -> Result<Option<String>> {
-        self.send(b"getcustomvariablevalue ")?;
-        self.send(variable_name.as_bytes())?;
-        self.send(b"\n")?;
+        let mut cmd = Vec::with_capacity(24 + variable_name.len());
+        cmd.extend_from_slice(b"getcustomvariablevalue ");
+        cmd.extend_from_slice(variable_name.as_bytes());
+        cmd.push(b'\n');
+        self.send(&cmd)?;
 
         let response = self.recv()?;
         let value = str::from_utf8(&response)?;
